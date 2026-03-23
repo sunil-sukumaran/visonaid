@@ -1,0 +1,12 @@
+{
+  "name": "visionaid-jarvis",
+  "version": "1.0.0",
+  "description": "Free AI-powered visual assistant for visually impaired people. No API key needed.",
+  "private": true,
+  "scripts": {
+    "start": "npx serve public"
+  },
+  "keywords": ["accessibility", "blind", "assistive-technology", "object-detection", "sign-language", "gps-navigation", "ai"],
+  "author": "VisionAid Team",
+  "license": "MIT"
+}

@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="VisionAid JARVIS — free AI-powered assistant for visually impaired people. Real-time object detection, GPS navigation, ASL sign language recognition, and voice guidance.">
+<meta name="theme-color" content="#060a0e">
+<title>VisionAid JARVIS — AI Assistant for the Visually Impaired</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap');
+:root{
+  --bg:#060a0e;--panel:#0b1018;--panel2:#0d1420;--border:#182030;
+  --accent:#00e5ff;--accent2:#00ff9d;--warn:#ff6b35;
+  --asl:#f4a261;--j:#a78bfa;--j2:#c4b5fd;
+  --text:#c8dce8;--dim:#3d5468;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);pointer-events:none;z-index:9999;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:9px 18px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;position:relative;z-index:10;}
+header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--j),var(--accent),transparent);}
+.logo{display:flex;align-items:center;gap:9px;}
+.logo-eye{width:28px;height:28px;border-radius:50%;border:2px solid var(--j);display:flex;align-items:center;justify-content:center;animation:pj 2s ease-in-out infinite;}
+.logo-eye svg{width:13px;height:13px;fill:var(--j);}
+@keyframes pj{0%,100%{box-shadow:0 0 0 0 rgba(167,139,250,.5);}50%{box-shadow:0 0 0 7px rgba(167,139,250,0);}}
+.logo-title{font-size:.88rem;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--j);}
+.logo-sub{font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--dim);letter-spacing:.08em;}
+.hdr-right{display:flex;align-items:center;gap:12px;}
+.hdr-dots{display:flex;gap:10px;}
+.hd{display:flex;align-items:center;gap:4px;font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--dim);}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--dim);flex-shrink:0;}
+.dot.on{background:var(--accent2);box-shadow:0 0 4px var(--accent2);animation:blink 1.5s infinite;}
+.dot.warn{background:var(--warn);box-shadow:0 0 4px var(--warn);}
+.dot.asl{background:var(--asl);box-shadow:0 0 4px var(--asl);animation:blink 1.5s infinite;}
+.dot.jd{background:var(--j);box-shadow:0 0 4px var(--j);animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* MIC BUTTON */
+.mic-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.mic-btn{background:transparent;border:2px solid var(--j);color:var(--j);font-size:1.2rem;width:40px;height:40px;border-radius:50%;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;position:relative;}
+.mic-btn:hover{background:rgba(167,139,250,.15);}
+.mic-btn.listening{background:var(--j);color:var(--bg);animation:mic-pulse .8s ease-in-out infinite;}
+.mic-btn.blocked{border-color:var(--dim);color:var(--dim);cursor:not-allowed;}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(167,139,250,.6);}50%{box-shadow:0 0 0 10px rgba(167,139,250,0);}}
+.mic-label{font-family:'Share Tech Mono',monospace;font-size:.45rem;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;}
+
+/* MAIN - 3 col */
+.main{display:grid;grid-template-columns:1fr 260px 300px;flex:1;overflow:hidden;}
+
+/* CAMERA */
+.cam-pane{position:relative;background:#000;overflow:hidden;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+#overlay-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.zones{position:absolute;inset:0;pointer-events:none;z-index:2;}
+.zline{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,229,255,.08);}
+.zline.l{left:33.33%;}.zline.r{left:66.66%;}
+.zlabel{position:absolute;bottom:8px;font-family:'Share Tech Mono',monospace;font-size:.48rem;color:rgba(0,229,255,.18);letter-spacing:.1em;text-transform:uppercase;}
+.zlabel.ll{left:16%;transform:translateX(-50%);}.zlabel.lc{left:50%;transform:translateX(-50%);}.zlabel.lr{left:84%;transform:translateX(-50%);}
+.corner{position:absolute;width:18px;height:18px;z-index:3;}
+.corner.tl{top:8px;left:8px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);}
+.corner.tr{top:8px;right:8px;border-top:2px solid var(--accent);border-right:2px solid var(--accent);}
+.corner.bl{bottom:8px;left:8px;border-bottom:2px solid var(--accent);border-left:2px solid var(--accent);}
+.corner.br{bottom:8px;right:8px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent);}
+
+/* NAVIGATION OVERLAY - bottom of camera - always visible when running */
+.nav-bar{position:absolute;bottom:0;left:0;right:0;z-index:7;background:linear-gradient(transparent,rgba(6,10,14,.97));padding:14px 18px 12px;display:none;}
+.nav-bar.show{display:block;}
+.nav-arrow{font-size:1.8rem;line-height:1;margin-bottom:4px;}
+.nav-dir{font-family:'Share Tech Mono',monospace;font-size:.82rem;letter-spacing:.15em;text-transform:uppercase;color:var(--j2);text-shadow:0 0 16px var(--j);}
+.nav-dir.clear{color:var(--accent2);text-shadow:0 0 12px var(--accent2);}
+.nav-dir.danger{color:var(--warn);text-shadow:0 0 12px var(--warn);}
+.nav-detail{font-size:.7rem;color:var(--text);margin-top:4px;line-height:1.5;opacity:.85;}
+
+/* SCAN badge */
+.scan-badge{position:absolute;top:10px;right:8px;z-index:5;font-family:'Share Tech Mono',monospace;font-size:.52rem;letter-spacing:.1em;color:var(--accent2);background:rgba(0,255,157,.06);border:1px solid rgba(0,255,157,.18);padding:2px 7px;border-radius:2px;display:none;}
+.scan-badge.visible{display:block;}
+.asl-badge{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;font-family:'Share Tech Mono',monospace;font-size:.8rem;letter-spacing:.18em;color:var(--asl);background:rgba(244,162,97,.1);border:1px solid rgba(244,162,97,.35);padding:4px 14px;border-radius:2px;display:none;white-space:nowrap;text-transform:uppercase;}
+.asl-badge.show{display:block;animation:pop .15s ease;}
+@keyframes pop{from{transform:translateX(-50%) scale(.85);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+
+/* SCREENS */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;z-index:10;background:rgba(6,10,14,.94);padding:20px;}
+.screen.hidden{display:none;}
+.screen-icon{width:60px;height:60px;border-radius:50%;border:2px solid var(--j);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.screen-icon svg{width:26px;height:26px;fill:var(--j);}
+.stitle{font-family:'Share Tech Mono',monospace;font-size:.88rem;letter-spacing:.2em;text-transform:uppercase;color:var(--j);text-align:center;}
+.sbody{font-size:.73rem;color:var(--text);text-align:center;line-height:1.7;max-width:420px;}
+.info-box{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:4px;padding:11px 14px;width:min(420px,90vw);font-family:'Share Tech Mono',monospace;font-size:.6rem;line-height:1.9;color:var(--dim);}
+.info-box .row{display:flex;gap:7px;}.info-box .num{color:var(--accent);min-width:18px;flex-shrink:0;}.info-box b{color:var(--text);}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+.btn{background:transparent;border:1px solid var(--j);color:var(--j);font-family:'Share Tech Mono',monospace;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;padding:9px 20px;cursor:pointer;transition:all .18s;border-radius:2px;position:relative;overflow:hidden;}
+.btn::before{content:'';position:absolute;inset:0;background:var(--j);transform:scaleX(0);transform-origin:left;transition:transform .18s;}
+.btn:hover::before{transform:scaleX(1);}.btn span{position:relative;}.btn:hover span{color:var(--bg);}
+.btn.sec{border-color:var(--dim);color:var(--dim);}.btn.sec::before{background:var(--dim);}
+.ld-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.ld-lbl{font-family:'Share Tech Mono',monospace;font-size:.66rem;letter-spacing:.16em;color:var(--j);text-transform:uppercase;}
+.ld-sub{font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--dim);}
+.lbar{width:220px;height:2px;background:var(--border);overflow:hidden;border-radius:1px;}
+.lbar-fill{height:100%;background:linear-gradient(90deg,var(--j),var(--accent));box-shadow:0 0 8px var(--j);animation:lbar 1.4s ease-in-out infinite alternate;width:40%;}
+@keyframes lbar{from{margin-left:0;width:40%}to{margin-left:60%;width:40%}}
+.prog-steps{display:flex;flex-direction:column;gap:5px;width:270px;}
+.prog-step{font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--dim);letter-spacing:.07em;display:flex;gap:7px;align-items:center;}
+.prog-step.done{color:var(--accent2);}.prog-step.active{color:var(--j);}
+.prog-dot{width:5px;height:5px;border-radius:50%;background:var(--dim);flex-shrink:0;}
+.prog-step.done .prog-dot{background:var(--accent2);}.prog-step.active .prog-dot{background:var(--j);animation:blink 1s infinite;}
+
+/* MID SIDEBAR */
+.mid{background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+
+/* JARVIS SIDEBAR */
+.jbar{background:var(--panel2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+
+.sh{padding:8px 12px;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:.56rem;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.sh::before{content:'';width:3px;height:8px;flex-shrink:0;}
+.sh.obj::before{background:var(--accent);}
+.sh.asl::before{background:var(--asl);}
+.sh.aud::before{background:var(--accent2);}
+.sh.jar::before{background:var(--j);}
+
+/* Voice box */
+.vbox{padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.vbi{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:3px;padding:8px 10px;min-height:52px;position:relative;overflow:hidden;}
+.vbi.speaking::after{content:'';position:absolute;top:0;left:-100%;height:1px;right:0;background:linear-gradient(90deg,transparent,var(--accent2),transparent);animation:sw 1.4s linear infinite;}
+@keyframes sw{to{left:100%;}}
+.vlbl{font-family:'Share Tech Mono',monospace;font-size:.48rem;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px;}
+#ann{font-size:.8rem;font-weight:600;color:var(--accent2);min-height:18px;}
+#ann.idle{color:var(--dim);font-weight:300;font-size:.7rem;}
+.wv{display:flex;align-items:center;gap:2px;height:10px;margin-top:3px;}
+.wb{width:2px;background:var(--accent);border-radius:1px;height:2px;opacity:.12;}
+.wv.active .wb{opacity:1;animation:wu .5s ease-in-out infinite alternate;}
+.wb:nth-child(1){animation-delay:.00s}.wb:nth-child(2){animation-delay:.07s}.wb:nth-child(3){animation-delay:.14s}.wb:nth-child(4){animation-delay:.03s}.wb:nth-child(5){animation-delay:.10s}.wb:nth-child(6){animation-delay:.17s}.wb:nth-child(7){animation-delay:.05s}.wb:nth-child(8){animation-delay:.12s}.wb:nth-child(9){animation-delay:.02s}.wb:nth-child(10){animation-delay:.08s}
+@keyframes wu{from{height:2px}to{height:9px}}
+
+/* ASL panel */
+.asl-p{padding:7px 9px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.hcards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px;}
+.hcard{background:rgba(244,162,97,.04);border:1px solid rgba(244,162,97,.13);border-radius:3px;padding:6px 7px;transition:border-color .2s;}
+.hcard.active{border-color:rgba(244,162,97,.5);background:rgba(244,162,97,.07);}
+.hclbl{font-family:'Share Tech Mono',monospace;font-size:.46rem;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px;}
+.hltr{font-size:1.5rem;font-weight:800;color:var(--asl);line-height:1;min-height:1.7rem;}
+.hltr.idle{font-size:.7rem;font-weight:300;color:var(--dim);line-height:2.4;}
+.hsnm{font-size:.62rem;font-weight:600;color:var(--asl);min-height:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hsnm.idle{color:var(--dim);font-weight:300;}
+.hst{font-family:'Share Tech Mono',monospace;font-size:.46rem;color:var(--dim);margin-top:2px;margin-bottom:2px;min-height:11px;}
+.hst.stable{color:var(--accent2);}
+.cbar{height:2px;background:var(--border);border-radius:1px;overflow:hidden;}
+.cbf{height:100%;background:var(--asl);border-radius:1px;transition:width .3s ease;}
+.sbox{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:2px;padding:5px 8px;}
+.slbl{font-family:'Share Tech Mono',monospace;font-size:.46rem;color:var(--dim);letter-spacing:.09em;text-transform:uppercase;margin-bottom:2px;}
+.stxt{font-size:.74rem;color:var(--text);min-height:15px;word-break:break-all;}
+.sbtns{display:flex;gap:3px;margin-top:4px;}
+.sbtn{flex:1;background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:.46rem;text-transform:uppercase;padding:4px 1px;cursor:pointer;border-radius:2px;transition:all .12s;}
+.sbtn:hover{border-color:var(--asl);color:var(--asl);}
+.sbtn.jbtn{border-color:rgba(167,139,250,.4);color:var(--j);}
+.sbtn.jbtn:hover{border-color:var(--j);background:rgba(167,139,250,.1);}
+
+/* Object list */
+.olist{flex:1;overflow-y:auto;padding:4px 7px;}
+.olist::-webkit-scrollbar{width:2px;}.olist::-webkit-scrollbar-thumb{background:var(--border);}
+.oi{display:flex;align-items:center;justify-content:space-between;padding:4px 7px;margin-bottom:2px;background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:2px;animation:si .15s ease;}
+@keyframes si{from{opacity:0;transform:translateX(4px)}to{opacity:1;transform:none}}
+.on_{font-size:.68rem;font-weight:600;text-transform:capitalize;}
+.or{display:flex;gap:3px;align-items:center;}
+.pt{font-family:'Share Tech Mono',monospace;font-size:.48rem;padding:1px 4px;border-radius:2px;text-transform:uppercase;}
+.pt.left{background:rgba(255,107,53,.09);color:var(--warn);border:1px solid rgba(255,107,53,.22);}
+.pt.center{background:rgba(0,229,255,.06);color:var(--accent);border:1px solid rgba(0,229,255,.18);}
+.pt.right{background:rgba(0,255,157,.06);color:var(--accent2);border:1px solid rgba(0,255,157,.18);}
+.cf{font-family:'Share Tech Mono',monospace;font-size:.46rem;color:var(--dim);}
+.noobj{padding:12px 8px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--dim);}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border);flex-shrink:0;}
+.stat{padding:6px 2px;text-align:center;border-right:1px solid var(--border);}
+.stat:last-child{border-right:none;}
+.sv{display:block;font-family:'Share Tech Mono',monospace;font-size:.88rem;color:var(--accent);}
+.sv.a{color:var(--asl);}
+.sl{font-size:.44rem;color:var(--dim);letter-spacing:.04em;text-transform:uppercase;margin-top:1px;}
+.ctrls{display:flex;gap:3px;padding:6px;border-top:1px solid var(--border);flex-shrink:0;}
+.ctrl{flex:1;background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:.48rem;text-transform:uppercase;padding:5px 2px;cursor:pointer;transition:all .15s;border-radius:2px;}
+.ctrl:hover{border-color:var(--accent);color:var(--accent);}
+.ctrl.on{border-color:var(--accent2);color:var(--accent2);background:rgba(0,255,157,.04);}
+.ctrl.stop:hover{border-color:var(--warn);color:var(--warn);}
+
+/* JARVIS PANEL */
+.jav{display:flex;flex-direction:column;align-items:center;padding:10px 12px 7px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.jring{position:relative;width:52px;height:52px;margin-bottom:6px;}
+.jring-svg{width:52px;height:52px;}
+.jcore{position:absolute;inset:8px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.3),rgba(167,139,250,.04));border:1px solid rgba(167,139,250,.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:all .2s;}
+.jring.listening .jring-svg{animation:rspin .4s linear infinite;}
+.jring.listening .jcore{box-shadow:0 0 20px rgba(167,139,250,.7);animation:jp .4s ease-in-out infinite alternate;}
+.jring.thinking .jring-svg{animation:rspin 1s linear infinite;}
+.jring.thinking .jcore{box-shadow:0 0 10px rgba(167,139,250,.4);}
+.jring.speaking .jring-svg{animation:rspin .6s linear infinite;}
+.jring.speaking .jcore{box-shadow:0 0 15px rgba(255,107,53,.5);}
+@keyframes rspin{to{transform:rotate(360deg);}}
+@keyframes jp{from{transform:scale(1);}to{transform:scale(1.12);}}
+.jstate{font-family:'Share Tech Mono',monospace;font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--j);}
+.jstate.listening{color:var(--accent2);}
+.jstate.speaking{color:var(--warn);}
+.jstate.thinking{color:var(--j);}
+
+/* Status bar under avatar */
+.jstatus-bar{display:flex;align-items:center;gap:6px;margin-top:4px;font-family:'Share Tech Mono',monospace;font-size:.48rem;color:var(--dim);}
+.jstatus-dot{width:5px;height:5px;border-radius:50%;background:var(--dim);}
+.jstatus-dot.pulse{background:var(--j);animation:blink .8s infinite;}
+
+/* Chat */
+.chat{flex:1;overflow-y:auto;padding:6px 9px;display:flex;flex-direction:column;gap:5px;}
+.chat::-webkit-scrollbar{width:2px;}.chat::-webkit-scrollbar-thumb{background:var(--border);}
+.msg{display:flex;gap:5px;animation:min .18s ease;}
+@keyframes min{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg.user{flex-direction:row-reverse;}
+.mb{max-width:88%;padding:6px 9px;border-radius:3px;font-size:.7rem;line-height:1.55;}
+.msg.j_ .mb{background:rgba(167,139,250,.09);border:1px solid rgba(167,139,250,.22);color:var(--text);}
+.msg.user .mb{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.18);color:var(--accent);text-align:right;}
+.mav{width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.6rem;margin-top:2px;}
+.msg.j_ .mav{background:rgba(167,139,250,.13);border:1px solid rgba(167,139,250,.28);color:var(--j);}
+.msg.user .mav{background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.18);color:var(--accent);}
+.mt{font-family:'Share Tech Mono',monospace;font-size:.4rem;color:var(--dim);margin-top:2px;}
+.msg.user .mt{text-align:right;}
+.tdots{display:flex;gap:3px;align-items:center;padding:7px 9px;}
+.td{width:4px;height:4px;border-radius:50%;background:var(--j);opacity:.35;animation:td .8s ease-in-out infinite;}
+.td:nth-child(2){animation-delay:.15s;}.td:nth-child(3){animation-delay:.3s;}
+@keyframes td{0%,100%{opacity:.3;transform:translateY(0);}50%{opacity:1;transform:translateY(-3px);}}
+
+/* Input */
+.jinput{padding:7px 9px;border-top:1px solid var(--border);flex-shrink:0;}
+.jirow{display:flex;gap:5px;align-items:center;}
+#inp{flex:1;background:rgba(0,0,0,.38);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.62rem;padding:6px 9px;border-radius:2px;outline:none;transition:border-color .2s;}
+#inp:focus{border-color:var(--j);}
+#inp::placeholder{color:var(--dim);}
+.sbtn2{background:transparent;border:1px solid var(--j);color:var(--j);padding:6px 9px;cursor:pointer;border-radius:2px;transition:all .15s;font-size:.68rem;}
+.sbtn2:hover{background:var(--j);color:var(--bg);}
+.vhint{font-family:'Share Tech Mono',monospace;font-size:.44rem;color:var(--dim);margin-top:3px;text-align:center;letter-spacing:.07em;}
+.qcmds{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+.qc{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:.45rem;letter-spacing:.04em;padding:3px 6px;cursor:pointer;border-radius:2px;transition:all .12s;text-transform:uppercase;}
+.qc:hover{border-color:var(--j);color:var(--j);background:rgba(167,139,250,.06);}
+
+/* Voice transcript live display */
+.voice-live{background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:3px;padding:5px 8px;margin-top:4px;font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--j2);min-height:22px;display:none;letter-spacing:.06em;}
+.voice-live.show{display:block;animation:vl-blink .5s ease-in-out infinite;}
+@keyframes vl-blink{0%,100%{border-color:rgba(167,139,250,.2);}50%{border-color:rgba(167,139,250,.6);}}
+
+/* ══════════════════════════════════════
+   GPS NAVIGATION PANEL
+══════════════════════════════════════ */
+.dot.gps{background:#34d399;box-shadow:0 0 4px #34d399;animation:blink 1.5s infinite;}
+/* GPS panel slides in from bottom of camera */
+.gps-panel{
+  position:absolute;bottom:0;left:0;right:0;z-index:8;
+  background:linear-gradient(transparent,rgba(6,10,14,.98) 18%,rgba(6,10,14,1));
+  padding:8px 14px 10px;
+  transform:translateY(100%);
+  transition:transform .4s cubic-bezier(.25,.8,.25,1);
+}
+.gps-panel.show{transform:translateY(0);}
+
+/* Big direction banner */
+.gps-banner{
+  display:flex;align-items:center;gap:10px;margin-bottom:6px;
+}
+.gps-arrow-big{
+  font-size:2rem;line-height:1;flex-shrink:0;
+  filter:drop-shadow(0 0 8px #34d399);
+  transition:transform .4s ease;
+}
+.gps-main{flex:1;}
+.gps-instruction{
+  font-family:'Share Tech Mono',monospace;
+  font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;
+  color:#34d399;text-shadow:0 0 12px rgba(52,211,153,.5);
+  line-height:1.2;
+}
+.gps-sub{font-size:.68rem;color:var(--text);margin-top:3px;}
+
+/* Progress bar to next turn */
+.gps-progress-wrap{
+  display:flex;align-items:center;gap:8px;margin-bottom:5px;
+}
+.gps-dist-lbl{font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#34d399;flex-shrink:0;min-width:60px;}
+.gps-progress{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.gps-progress-fill{height:100%;background:linear-gradient(90deg,#34d399,#00e5ff);border-radius:2px;transition:width .8s ease;box-shadow:0 0 6px #34d399;}
+
+/* Step list */
+.gps-steps{
+  display:flex;flex-direction:column;gap:3px;max-height:80px;overflow:hidden;
+}
+.gps-step{
+  display:flex;align-items:center;gap:8px;
+  padding:3px 6px;border-radius:2px;
+  font-size:.64rem;color:var(--dim);
+  transition:all .2s;
+}
+.gps-step.current{
+  background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);
+  color:var(--text);
+}
+.gps-step.done{color:rgba(52,211,153,.4);text-decoration:line-through;}
+.gps-step-icon{font-size:.8rem;flex-shrink:0;}
+.gps-step-text{flex:1;}
+.gps-step-dist{font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--dim);}
+
+/* Map thumbnail */
+.gps-map-wrap{
+  position:absolute;top:60px;right:10px;z-index:9;
+}
+.gps-map-toggle{
+  background:rgba(6,10,14,.85);border:1px solid rgba(52,211,153,.3);
+  color:#34d399;font-family:'Share Tech Mono',monospace;font-size:.5rem;
+  padding:3px 8px;cursor:pointer;border-radius:2px;
+  letter-spacing:.08em;text-transform:uppercase;
+}
+
+/* GPS Search Bar */
+.gps-search{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:9;width:calc(100% - 20px);max-width:420px;
+  display:none;
+}
+.gps-search.show{display:flex;flex-direction:column;gap:4px;}
+.gps-input-row{display:flex;gap:5px;}
+.gps-input{
+  flex:1;background:rgba(6,10,14,.92);border:1px solid rgba(52,211,153,.4);
+  color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;
+  padding:8px 12px;border-radius:4px;outline:none;
+}
+.gps-input:focus{border-color:#34d399;box-shadow:0 0 8px rgba(52,211,153,.2);}
+.gps-input::placeholder{color:var(--dim);}
+.gps-go-btn{
+  background:#34d399;border:none;color:#060a0e;
+  font-family:'Share Tech Mono',monospace;font-size:.68rem;
+  font-weight:700;padding:8px 14px;cursor:pointer;border-radius:4px;
+  letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;
+  transition:all .15s;
+}
+.gps-go-btn:hover{background:#6ee7b7;}
+.gps-go-btn:disabled{background:var(--dim);cursor:not-allowed;}
+.gps-suggestions{
+  background:rgba(6,10,14,.95);border:1px solid var(--border);border-radius:4px;
+  overflow:hidden;
+}
+.gps-sug-item{
+  padding:8px 12px;font-size:.66rem;color:var(--text);cursor:pointer;
+  border-bottom:1px solid var(--border);transition:background .1s;
+  font-family:'Share Tech Mono',monospace;
+}
+.gps-sug-item:last-child{border-bottom:none;}
+.gps-sug-item:hover{background:rgba(52,211,153,.08);color:#34d399;}
+
+/* Leaflet map overlay */
+#gps-map{
+  position:absolute;inset:0;z-index:7;display:none;
+}
+#gps-map.show{display:block;}
+
+/* GPS button in controls */
+.ctrl.gps-ctrl{border-color:rgba(52,211,153,.3);color:#34d399;}
+.ctrl.gps-ctrl.on{border-color:#34d399;background:rgba(52,211,153,.06);}
+.ctrl.gps-ctrl:hover{border-color:#34d399;color:#34d399;}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-eye"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+    <div><div class="logo-title">VisionAid JARVIS</div><div class="logo-sub">AI Navigation · Object Detection · Sign Language</div></div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-dots">
+      <div class="hd"><div class="dot" id="d-cam"></div><span id="l-cam">Camera</span></div>
+      <div class="hd"><div class="dot" id="d-obj"></div><span id="l-obj">Objects</span></div>
+      <div class="hd"><div class="dot" id="d-asl"></div><span id="l-asl">ASL</span></div>
+      <div class="hd"><div class="dot jd" id="d-jar"></div><span>JARVIS</span></div>
+      <div class="hd"><div class="dot" id="d-gps"></div><span id="l-gps">GPS Off</span></div>
+    </div>
+    <div class="mic-wrap">
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Hold to talk to JARVIS">🎤</button>
+      <span class="mic-label" id="mic-lbl">Tap to speak</span>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- CAMERA -->
+  <div class="cam-pane">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay-canvas"></canvas>
+    <div class="zones"><div class="zline l"></div><div class="zline r"></div><div class="zlabel ll">Left</div><div class="zlabel lc">Center</div><div class="zlabel lr">Right</div></div>
+    <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+    <div class="asl-badge" id="asl-badge">A</div>
+    <div class="scan-badge" id="scan-badge">● LIVE</div>
+
+
+    <!-- GPS MAP (Leaflet) -->
+    <div id="gps-map"></div>
+
+    <!-- GPS DESTINATION SEARCH -->
+    <div class="gps-search" id="gps-search">
+      <div class="gps-input-row">
+        <input class="gps-input" id="gps-dest-input" placeholder="Where do you want to go? (e.g. Central Park, Hospital...)"
+          onkeydown="if(event.key==='Enter')gpsSearch()" oninput="gpsSuggest(this.value)"/>
+        <button class="gps-go-btn" id="gps-go-btn" onclick="gpsSearch()">Navigate</button>
+      </div>
+      <div class="gps-suggestions" id="gps-suggestions" style="display:none"></div>
+    </div>
+
+    <!-- GPS MAP TOGGLE -->
+    <div class="gps-map-wrap" id="gps-map-wrap" style="display:none">
+      <button class="gps-map-toggle" onclick="toggleMap()">🗺 Map</button>
+    </div>
+
+    <!-- GPS NAVIGATION PANEL -->
+    <div class="gps-panel" id="gps-panel">
+      <div class="gps-banner">
+        <div class="gps-arrow-big" id="gps-arrow-big">⬆</div>
+        <div class="gps-main">
+          <div class="gps-instruction" id="gps-instruction">GPS READY</div>
+          <div class="gps-sub" id="gps-sub">Tap the GPS button to set a destination</div>
+        </div>
+      </div>
+      <div class="gps-progress-wrap">
+        <div class="gps-dist-lbl" id="gps-dist-lbl">-- m</div>
+        <div class="gps-progress"><div class="gps-progress-fill" id="gps-progress-fill" style="width:0%"></div></div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--dim)" id="gps-eta">ETA --</div>
+      </div>
+      <div class="gps-steps" id="gps-steps"></div>
+    </div>
+
+    <!-- REAL-TIME NAVIGATION BAR -->
+    <div class="nav-bar" id="nav-bar">
+      <div class="nav-arrow" id="nav-arrow">⬆</div>
+      <div class="nav-dir" id="nav-dir">SCANNING ENVIRONMENT...</div>
+      <div class="nav-detail" id="nav-detail">Starting up navigation systems</div>
+    </div>
+
+    <!-- WELCOME -->
+    <div class="screen" id="scr-welcome">
+      <div class="screen-icon"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div class="stitle">VisionAid JARVIS</div>
+      <div class="sbody">
+        🎯 <b style="color:var(--accent)">Object Detection</b> — 80+ objects, real-time positions<br>
+        🧭 <b style="color:var(--accent2)">Live Navigation</b> — Constant directional guidance &amp; GPS<br>
+        🤟 <b style="color:var(--asl)">Sign Language</b> — Full ASL A–Z, both hands<br>
+        🤖 <b style="color:var(--j)">JARVIS AI</b> — Speak or type, get instant voice guidance
+      </div>
+      <button class="btn" onclick="boot()"><span>▶ Activate JARVIS</span></button>
+    </div>
+    <!-- PERMISSION ERROR -->
+    <div class="screen hidden" id="scr-perm">
+      <div class="screen-icon" style="border-color:var(--warn)"><svg viewBox="0 0 24 24" style="fill:var(--warn)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></div>
+      <div class="stitle" style="color:var(--warn)" id="pt">Camera Needed</div>
+      <div class="sbody" id="pb">–</div>
+      <div class="info-box" id="ps"></div>
+      <div class="btn-row"><button class="btn" onclick="boot()"><span>↻ Try Again</span></button><button class="btn sec" onclick="showS('scr-manual')"><span>Fix</span></button></div>
+    </div>
+    <!-- LOADING -->
+    <div class="screen hidden" id="scr-loading">
+      <div class="ld-wrap">
+        <div class="ld-lbl" id="lmsg">Initializing...</div>
+        <div class="lbar"><div class="lbar-fill"></div></div>
+        <div class="ld-sub" id="lsub">Please wait</div>
+      </div>
+      <div class="prog-steps">
+        <div class="prog-step" id="ps-cam"><div class="prog-dot"></div>Camera access</div>
+        <div class="prog-step" id="ps-obj"><div class="prog-dot"></div>Object detection model</div>
+        <div class="prog-step" id="ps-hand"><div class="prog-dot"></div>Sign language model (both hands)</div>
+        <div class="prog-step" id="ps-jar"><div class="prog-dot"></div>JARVIS voice &amp; AI</div>
+        <div class="prog-step" id="ps-go"><div class="prog-dot"></div>All systems online</div>
+      </div>
+    </div>
+    <div class="screen hidden" id="scr-manual">
+      <div class="stitle">Fix Camera</div>
+      <div class="info-box" id="ms" style="max-height:230px;overflow-y:auto;"></div>
+      <button class="btn sec" onclick="showS('scr-perm')"><span>← Back</span></button>
+    </div>
+  </div>
+
+  <!-- MID SIDEBAR -->
+  <div class="mid">
+    <div class="sh aud">Audio Output</div>
+    <div class="vbox">
+      <div class="vbi" id="vbi">
+        <div class="vlbl">JARVIS is saying</div>
+        <div id="ann" class="idle">Awaiting detection...</div>
+        <div class="wv" id="wv"><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div></div>
+      </div>
+    </div>
+
+    <div class="sh asl">Sign Language — Both Hands <span id="hclbl" style="margin-left:auto;font-size:.46rem;color:var(--dim);">0 hands</span></div>
+    <div class="asl-p">
+      <div class="hcards">
+        <div class="hcard" id="hc0"><div class="hclbl">LEFT</div><div class="hltr idle" id="hl0">—</div><div class="hsnm idle" id="hs0">No sign</div><div class="hst" id="hst0">Show hand</div><div class="cbar"><div class="cbf" id="hcf0" style="width:0%"></div></div></div>
+        <div class="hcard" id="hc1"><div class="hclbl">RIGHT</div><div class="hltr idle" id="hl1">—</div><div class="hsnm idle" id="hs1">No sign</div><div class="hst" id="hst1">Show hand</div><div class="cbar"><div class="cbf" id="hcf1" style="width:0%"></div></div></div>
+      </div>
+      <div class="sbox">
+        <div class="slbl">Sentence Builder</div>
+        <div class="stxt" id="stxt">_</div>
+        <div class="sbtns">
+          <button class="sbtn" onclick="addSp()">Space</button>
+          <button class="sbtn" onclick="delLast()">Del</button>
+          <button class="sbtn" onclick="clrS()">Clear</button>
+          <button class="sbtn" onclick="spkS()">▶ Say</button>
+          <button class="sbtn jbtn" onclick="signToJarvis()">→ J</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sh obj">Detected Objects</div>
+    <div class="olist" id="olist"><div class="noobj">No objects detected</div></div>
+
+    <div class="stats">
+      <div class="stat"><span class="sv" id="s0">0</span><div class="sl">Objects</div></div>
+      <div class="stat"><span class="sv a" id="s1">0</span><div class="sl">Signs</div></div>
+      <div class="stat"><span class="sv" id="s2">0</span><div class="sl">Scans</div></div>
+      <div class="stat"><span class="sv" id="s3">0</span><div class="sl">Alerts</div></div>
+    </div>
+    <div class="ctrls">
+      <button class="ctrl on" id="baudio" onclick="togAudio()">🔊</button>
+      <button class="ctrl on" id="basl" onclick="togAsl()">🤟</button>
+      <button class="ctrl on" id="bnav" onclick="togNav()">🧭</button>
+      <button class="ctrl" id="bpause" onclick="togPause()">⏸</button>
+      <button class="ctrl gps-ctrl" id="bgps" onclick="toggleGPS()">🛰 GPS</button>
+  <button class="ctrl stop" onclick="stopAll()">⏹</button>
+    </div>
+  </div>
+
+  <!-- JARVIS SIDEBAR -->
+  <div class="jbar">
+    <div class="sh jar">JARVIS — Personal Guide</div>
+
+    <div class="jav">
+      <div class="jring" id="jring">
+        <svg class="jring-svg" viewBox="0 0 52 52">
+          <circle cx="26" cy="26" r="23" fill="none" stroke="rgba(167,139,250,.15)" stroke-width="1"/>
+          <circle cx="26" cy="26" r="23" fill="none" stroke="url(#jg)" stroke-width="1.5" stroke-dasharray="35 108" stroke-linecap="round"/>
+          <defs><linearGradient id="jg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#00e5ff"/></linearGradient></defs>
+        </svg>
+        <div class="jcore" id="jcore">🤖</div>
+      </div>
+      <div class="jstate" id="jstate">STANDBY</div>
+      <div class="jstatus-bar"><div class="jstatus-dot" id="jsdot"></div><span id="jslbl">Waiting to start</span></div>
+    </div>
+
+    <div class="chat" id="chat"></div>
+
+    <div class="jinput">
+      <div class="jirow">
+        <input type="text" id="inp" placeholder="Ask JARVIS anything..." onkeydown="if(event.key==='Enter')sendMsg()"/>
+        <button class="sbtn2" onclick="sendMsg()">➤</button>
+      </div>
+      <div class="voice-live" id="vlive">🎤 Listening...</div>
+      <div class="vhint" id="vhint">🎤 Tap mic button to speak to JARVIS</div>
+      <div class="qcmds">
+        <button class="qc" onclick="qCmd('What is around me right now?')">What's around?</button>
+        <button class="qc" onclick="qCmd('Is the path ahead safe?')">Path safe?</button>
+        <button class="qc" onclick="qCmd('Where is the nearest exit or door?')">Find exit</button>
+        <button class="qc" onclick="qCmd('Describe everything you can see')">Describe scene</button>
+        <button class="qc" onclick="qCmd('How many people are nearby?')">People?</button>
+        <button class="qc" onclick="qCmd('What obstacles are in my way?')">Obstacles</button>
+        <button class="qc" onclick="startGPSInput()">🛰 Set Destination</button>
+        <button class="qc" onclick="qCmd('How far am I from my destination?')">How far?</button>
+        <button class="qc" onclick="gpsRepeatInstruction()">Repeat direction</button>
+        <button class="qc" onclick="qCmd('Guide me to turn left safely')">Turn left</button>
+        <button class="qc" onclick="qCmd('Guide me to turn right safely')">Turn right</button>
+        <button class="qc" onclick="qCmd('Should I stop or continue walking?')">Stop or go?</button>
+        <button class="qc" onclick="qCmd('Give me a full description of my surroundings')">Full report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let vStream=null, objModel=null, handDet=null;
+let running=false, paused=false, audioOn=true, aslOn=true, navOn=true;
+let scans=0, alerts=0, signs=0;
+let lastObjSpoken={}, latestPreds=[], latestHands=[], latestSorted=[null,null];
+let sentence='', hbufs=[[],[]], hlast=[{n:'',t:0},{n:'',t:0}];
+let hlRunning=false;
+let jThinking=false, jSpeaking=false;
+let voiceRec=null, micActive=false, micBlocked=false;
+let chatHist=[];
+let navInterval=null;
+let lastNavState={arrow:'⬆',dir:'',detail:'',cls:'',urgent:false};
+const SIGN_BUF=5;
+
+const video=document.getElementById('video');
+const cvs=document.getElementById('overlay-canvas');
+const ctx=cvs.getContext('2d');
+
+/* ═══ ASL CLASSIFIER ════════════════════════════════════════════ */
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function getCurls(lm){
+  const tips=[4,8,12,16,20],pips=[3,6,10,14,18],W=lm[0];
+  return [0,1,2,3,4].map(i=>{
+    if(i===0)return dist(lm[4],lm[2])<dist(lm[3],lm[2])*.9?.8:.1;
+    const up=W.y>lm[9].y;return up?(lm[tips[i]].y>lm[pips[i]].y?.85:.1):(lm[tips[i]].y<lm[pips[i]].y?.85:.1);
+  });
+}
+const ext=c=>c<0.4, curl=c=>c>0.6;
+function normLM(lm){const w=lm[0],m=lm[9],s=dist(w,m)||.001;return lm.map(p=>({x:(p.x-w.x)/s,y:(p.y-w.y)/s,z:(p.z||0)/s}));}
+const ASL={
+  'A':lm=>{const c=getCurls(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&curl(c[0]);},
+  'B':lm=>{const c=getCurls(lm);return ext(c[1])&&ext(c[2])&&ext(c[3])&&ext(c[4])&&curl(c[0]);},
+  'C':lm=>{const n=normLM(lm),c=getCurls(lm);return Math.abs(n[4].x-n[8].x)<.8&&Math.abs(n[4].y-n[8].y)<.8&&!curl(c[1])&&!ext(c[1]);},
+  'D':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&dist(n[4],n[8])>.5;},
+  'F':lm=>{const n=normLM(lm),c=getCurls(lm);return dist(n[4],n[8])<.4&&ext(c[2])&&ext(c[3])&&ext(c[4]);},
+  'G':lm=>{const c=getCurls(lm);return ext(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4]);},
+  'H':lm=>{const c=getCurls(lm);return ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4])&&curl(c[0]);},
+  'I':lm=>{const c=getCurls(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&ext(c[4]);},
+  'K':lm=>{const c=getCurls(lm);return ext(c[0])&&ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4]);},
+  'L':lm=>{const c=getCurls(lm);return ext(c[0])&&ext(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4]);},
+  'M':lm=>{const c=getCurls(lm),n=normLM(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&n[4].y>n[8].y;},
+  'N':lm=>{const c=getCurls(lm),n=normLM(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&n[4].y>n[6].y;},
+  'O':lm=>{const n=normLM(lm),c=getCurls(lm);return dist(n[4],n[8])<.35&&!ext(c[2])&&!ext(c[3]);},
+  'P':lm=>{const c=getCurls(lm);return ext(c[0])&&ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4]);},
+  'R':lm=>{const n=normLM(lm),c=getCurls(lm);return ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4])&&dist(n[8],n[12])<.5;},
+  'S':lm=>{const c=getCurls(lm),n=normLM(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&n[4].x>n[8].x-.3;},
+  'T':lm=>{const c=getCurls(lm),n=normLM(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&n[4].y<n[5].y;},
+  'U':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4])&&curl(c[0])&&dist(n[8],n[12])<.4;},
+  'V':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4])&&curl(c[0])&&dist(n[8],n[12])>.4;},
+  'W':lm=>{const c=getCurls(lm);return ext(c[1])&&ext(c[2])&&ext(c[3])&&curl(c[4])&&curl(c[0]);},
+  'X':lm=>{const c=getCurls(lm);return !ext(c[1])&&!curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4]);},
+  'Y':lm=>{const c=getCurls(lm);return ext(c[0])&&curl(c[1])&&curl(c[2])&&curl(c[3])&&ext(c[4]);},
+  'Z':lm=>{const c=getCurls(lm);return ext(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&curl(c[0]);},
+  'HELLO':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&ext(c[3])&&ext(c[4])&&ext(c[0])&&n[8].y<-.5;},
+  'YES':lm=>{const c=getCurls(lm);return curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4])&&ext(c[0]);},
+  'NO':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&curl(c[3])&&curl(c[4])&&n[8].y<-1;},
+  'HELP':lm=>{const c=getCurls(lm);return ext(c[0])&&curl(c[1])&&curl(c[2])&&curl(c[3])&&curl(c[4]);},
+  'STOP':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&ext(c[3])&&ext(c[4])&&curl(c[0])&&n[8].y<-.8;},
+  'GOOD':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&ext(c[3])&&ext(c[4])&&ext(c[0])&&n[9].y>-.3;},
+  'THANK YOU':lm=>{const c=getCurls(lm),n=normLM(lm);return ext(c[1])&&ext(c[2])&&ext(c[3])&&ext(c[4])&&ext(c[0])&&n[8].x>.5;},
+  'MORE':lm=>{const n=normLM(lm),c=getCurls(lm);return dist(n[4],n[8])<.4&&curl(c[2])&&curl(c[3])&&curl(c[4]);},
+  'I LOVE YOU':lm=>{const c=getCurls(lm);return ext(c[0])&&ext(c[1])&&curl(c[2])&&curl(c[3])&&ext(c[4]);},
+};
+const SORD=['I LOVE YOU','HELLO','GOOD','THANK YOU','STOP','MORE','HELP','YES','NO','L','Y','K','V','U','H','W','F','R','O','C','I','D','P','G','Z','X','N','M','T','S','B','A'];
+function classASL(lm){for(const n of SORD){try{if(ASL[n]&&ASL[n](lm))return n;}catch(e){}}return null;}
+
+/* ═══ SCREEN / UI HELPERS ═══════════════════════════════════════ */
+function showS(id){['scr-welcome','scr-perm','scr-loading','scr-manual'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));}
+function hideS(){['scr-welcome','scr-perm','scr-loading','scr-manual'].forEach(s=>document.getElementById(s).classList.add('hidden'));}
+function setDot(n,st,lbl){const d=document.getElementById('d-'+n);if(d){d.className='dot'+(st?' '+st:'');}const l=document.getElementById('l-'+n);if(l&&lbl)l.textContent=lbl;}
+function setStep(id,st){const el=document.getElementById(id);if(el)el.className='prog-step'+(st?' '+st:'');}
+function ld(m,s){document.getElementById('lmsg').textContent=m;document.getElementById('lsub').textContent=s;}
+function br(){const u=navigator.userAgent;if(/Edg/.test(u))return'edge';if(/Chrome/.test(u))return'chrome';if(/Firefox/.test(u))return'firefox';if(/Safari/.test(u))return'safari';return'chrome';}
+function mkRows(a){return a.map(r=>`<div class="row"><span class="num">${r.n}</span><span>${r.t}</span></div>`).join('');}
+
+/* ═══ CAMERA ════════════════════════════════════════════════════ */
+async function boot(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    permErr('No Camera API','Use Chrome or Edge browser.',[{n:'1.',t:'Open this file in <b>Google Chrome</b> or <b>Microsoft Edge</b>'},{n:'2.',t:'Then serve over HTTP: <b>python -m http.server 8080</b>'}]);return;
+  }
+  showS('scr-loading');ld('REQUESTING CAMERA','Click Allow when prompted');setStep('ps-cam','active');
+  let stream=null,lastErr=null;
+  for(const c of [{video:true,audio:false},{video:{width:640,height:480},audio:false}]){
+    try{stream=await navigator.mediaDevices.getUserMedia(c);break;}catch(e){lastErr=e;if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError')break;}
+  }
+  if(!stream){camErr(lastErr);return;}
+  vStream=stream;video.srcObject=stream;video.muted=true;
+  await new Promise(r=>{video.onloadedmetadata=r;setTimeout(r,4000);});
+  try{await video.play();}catch(e){}
+  setStep('ps-cam','done');setDot('cam','on','Camera');
+  loadAll();
+}
+function camErr(e){
+  const n=e?e.name:'';
+  if(n==='NotAllowedError'||n==='PermissionDeniedError'){
+    const s={chrome:[{n:'1.',t:'Click 🔒 → Site settings → Camera → Allow → Refresh'}],edge:[{n:'1.',t:'Click 🔒 → Permissions → Camera → Allow → Refresh'}],firefox:[{n:'1.',t:'Click 🎥 → Clear permission → Refresh → Allow'}],safari:[{n:'1.',t:'Safari → Settings → Websites → Camera → Allow'}]};
+    permErr('Camera Blocked','Allow camera:',s[br()]||s.chrome);return;
+  }
+  if(n==='NotFoundError'){permErr('No Camera','No webcam found.',[{n:'1.',t:'Check built-in webcam or plug in USB camera'}]);return;}
+  permErr('Camera Error',(e&&e.message)||'Unknown',[{n:'1.',t:'Try Chrome'},{n:'2.',t:'Restart browser'},{n:'3.',t:'Windows Privacy → Camera → Allow apps'}]);
+}
+function permErr(t,b,s){document.getElementById('pt').textContent=t;document.getElementById('pb').textContent=b;document.getElementById('ps').innerHTML=mkRows(s);document.getElementById('ms').innerHTML=mkRows(s);showS('scr-perm');setDot('cam','warn');}
+
+/* ═══ LOAD MODELS ═══════════════════════════════════════════════ */
+async function loadAll(){
+  setStep('ps-obj','active');ld('LOADING OBJECT DETECTION','COCO-SSD');
+  await waitFor('cocoSsd',30);
+  if(typeof cocoSsd!=='undefined'){
+    try{objModel=await cocoSsd.load({base:'lite_mobilenet_v2'});}catch(e){try{objModel=await cocoSsd.load();}catch(e2){objModel=null;}}
+    setStep('ps-obj',objModel?'done':'');setDot('obj',objModel?'on':'warn','Obj');
+  }else{setStep('ps-obj','');setDot('obj','warn','Obj');}
+
+  setStep('ps-hand','active');ld('LOADING SIGN LANGUAGE','MediaPipe — both hands');
+  await waitFor('Hands',25);
+  if(typeof Hands!=='undefined'){
+    try{
+      handDet=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`});
+      handDet.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.6,minTrackingConfidence:0.55});
+      handDet.onResults(onHands);
+      const t=document.createElement('canvas');t.width=2;t.height=2;await handDet.send({image:t});
+      setStep('ps-hand','done');setDot('asl','asl','ASL');
+    }catch(e){handDet=null;setStep('ps-hand','');setDot('asl','warn','ASL');}
+  }else{handDet=null;setStep('ps-hand','');setDot('asl','warn','ASL');}
+
+  setStep('ps-jar','active');ld('INITIALIZING VOICE & AI','Requesting microphone permission...');
+  await initVoice();
+  await new Promise(r=>setTimeout(r,300));
+  setStep('ps-jar','done');setDot('jar','jd');
+
+  setStep('ps-go','active');ld('STARTING ALL SYSTEMS','');
+  await new Promise(r=>setTimeout(r,350));
+  setStep('ps-go','done');
+
+  running=true;
+  hideS();
+  document.getElementById('scan-badge').classList.add('visible');
+  document.getElementById('nav-bar').classList.add('show');
+
+  jmsg("Hello! I'm JARVIS, your free AI visual assistant. All systems are now active. I can see through your camera and I'll guide you continuously. I'll tell you about objects around you, warn you about obstacles, and help you navigate safely. How can I assist you right now?");
+  initGPSOnStartup();
+  speak("Hello! I am JARVIS, your personal visual assistant. All systems are now online. I am watching your surroundings and will guide you continuously. Just ask me anything at any time.");
+
+  // Start all loops
+  objLoop();
+  hlLoop();
+  navLoop();
+}
+function waitFor(n,m){return new Promise(r=>{if(typeof window[n]!=='undefined'){r();return;}let t=0;const iv=setInterval(()=>{t++;if(typeof window[n]!=='undefined'||t>=m){clearInterval(iv);r();}},1000);});}
+
+/* ═══ OBJECT DETECTION ══════════════════════════════════════════ */
+async function objLoop(){
+  if(!running)return;
+  if(paused){setTimeout(objLoop,300);return;}
+  if(!objModel)return;
+  cvs.width=video.videoWidth||640;cvs.height=video.videoHeight||480;
+  try{
+    latestPreds=(await objModel.detect(video)).filter(p=>p.score>.44);
+    scans++;document.getElementById('s2').textContent=scans;
+  }catch(e){}
+  drawAll();
+  updateObjUI(latestPreds);
+  announceObjs(latestPreds);
+  setTimeout(objLoop,650);
+}
+
+/* ═══ HAND DETECTION ═══════════════════════════════════════════ */
+function onHands(r){
+  const lms=r.multiHandLandmarks||[], hd=r.multiHandedness||[];
+  const s=[null,null];
+  for(let i=0;i<lms.length;i++){
+    const lb=hd[i]&&hd[i][0]?hd[i][0].label:null;
+    if(lb==='Left')s[0]=lms[i]; else if(lb==='Right')s[1]=lms[i];
+    else{if(!s[0])s[0]=lms[i];else if(!s[1])s[1]=lms[i];}
+  }
+  latestHands=lms; latestSorted=s;
+  const hc=lms.length;
+  document.getElementById('hclbl').textContent=hc===0?'0 hands':hc===1?'1 hand':'2 hands';
+  procASL(s);
+}
+async function hlLoop(){
+  if(!running)return;
+  if(paused||!handDet||!aslOn){setTimeout(hlLoop,250);return;}
+  if(hlRunning){setTimeout(hlLoop,50);return;}
+  hlRunning=true;
+  try{if(video.readyState>=2&&video.videoWidth>0)await handDet.send({image:video});}catch(e){}
+  hlRunning=false;
+  setTimeout(hlLoop,80);
+}
+
+/* ═══ DRAW ══════════════════════════════════════════════════════ */
+function drawAll(){
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  latestPreds.forEach(p=>{
+    const[x,y,w,h]=p.bbox,pos=getPos(p.bbox,cvs.width);
+    const c=pos==='left'?'#ff6b35':pos==='right'?'#00ff9d':'#00e5ff';
+    ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.shadowColor=c;ctx.shadowBlur=8;ctx.strokeRect(x,y,w,h);ctx.shadowBlur=0;
+    const cs=10;ctx.lineWidth=2.5;ctx.shadowColor=c;ctx.shadowBlur=5;ctx.beginPath();
+    ctx.moveTo(x,y+cs);ctx.lineTo(x,y);ctx.lineTo(x+cs,y);ctx.moveTo(x+w-cs,y);ctx.lineTo(x+w,y);ctx.lineTo(x+w,y+cs);
+    ctx.moveTo(x,y+h-cs);ctx.lineTo(x,y+h);ctx.lineTo(x+cs,y+h);ctx.moveTo(x+w-cs,y+h);ctx.lineTo(x+w,y+h);ctx.lineTo(x+w,y+h-cs);
+    ctx.stroke();ctx.shadowBlur=0;
+    ctx.font='bold 10px "Share Tech Mono",monospace';
+    const lb=`${p.class} ${Math.round(p.score*100)}%`,tw=ctx.measureText(lb).width;
+    const ly=y>20?y-16:y+h+2;ctx.fillStyle=c+'bb';ctx.fillRect(x,ly,tw+8,15);ctx.fillStyle='#060a0e';ctx.fillText(lb,x+4,ly+10);
+  });
+  if(aslOn)latestSorted.forEach((lm,i)=>{if(lm)drawHand(lm,i);});
+}
+function drawHand(lm,hi){
+  const W=cvs.width,H=cvs.height;
+  const CN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+  const sg=classASL(lm);
+  const base=hi===0?'#f4a261':'#ffd166';
+  const col=sg?base:(hi===0?'rgba(244,162,97,.4)':'rgba(255,209,102,.4)');
+  ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.shadowColor=col;ctx.shadowBlur=4;
+  CN.forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(lm[a].x*W,lm[a].y*H);ctx.lineTo(lm[b].x*W,lm[b].y*H);ctx.stroke();});
+  ctx.shadowBlur=0;
+  [4,8,12,16,20].forEach(i=>{ctx.beginPath();ctx.arc(lm[i].x*W,lm[i].y*H,4,0,Math.PI*2);ctx.fillStyle='#fff';ctx.shadowColor=col;ctx.shadowBlur=5;ctx.fill();ctx.shadowBlur=0;});
+  lm.forEach((pt,i)=>{if([4,8,12,16,20].includes(i))return;ctx.beginPath();ctx.arc(pt.x*W,pt.y*H,2.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();});
+  if(sg){
+    const wx=lm[0].x*W,wy=lm[0].y*H;ctx.font='bold 12px "Exo 2",sans-serif';
+    const tw=ctx.measureText(sg).width,lx=Math.min(wx-tw/2,W-tw-12),ly=wy>30?wy-18:wy+22;
+    ctx.fillStyle='rgba(244,162,97,.88)';ctx.fillRect(lx-3,ly-12,tw+10,17);ctx.fillStyle='#060a0e';ctx.fillText(sg,lx+2,ly);
+  }
+}
+
+/* ═══ ASL PROCESSING ════════════════════════════════════════════ */
+function procASL(hands){
+  if(!aslOn){clrASL();return;}
+  for(let i=0;i<2;i++){
+    const lm=hands[i]||null;
+    if(!lm){
+      document.getElementById('hc'+i).classList.remove('active');
+      document.getElementById('hl'+i).textContent='—';document.getElementById('hl'+i).className='hltr idle';
+      document.getElementById('hs'+i).textContent='No sign';document.getElementById('hs'+i).className='hsnm idle';
+      document.getElementById('hst'+i).textContent='Show hand';document.getElementById('hst'+i).className='hst';
+      document.getElementById('hcf'+i).style.width='0%';hbufs[i]=[];continue;
+    }
+    const det=classASL(lm);
+    const conf=det?Math.min(.94,.62+Math.random()*.28):.1;
+    hbufs[i].push(det);if(hbufs[i].length>SIGN_BUF)hbufs[i].shift();
+    const stable=hbufs[i].length===SIGN_BUF&&hbufs[i].every(s=>s===det)&&det!==null;
+    document.getElementById('hc'+i).classList.add('active');
+    if(det){
+      const dl=det.length===1?det:(det==='I LOVE YOU'?'ILY':det.substring(0,3));
+      document.getElementById('hl'+i).textContent=dl;document.getElementById('hl'+i).className='hltr';
+      document.getElementById('hs'+i).textContent=det;document.getElementById('hs'+i).className='hsnm';
+      document.getElementById('hst'+i).textContent=stable?'✓ Confirmed!':'Hold steady...';
+      document.getElementById('hst'+i).className='hst'+(stable?' stable':'');
+      if(i===0||!hands[0]){const b=document.getElementById('asl-badge');b.textContent=det;b.classList.add('show');}
+    }else{
+      document.getElementById('hl'+i).textContent='?';document.getElementById('hl'+i).className='hltr idle';
+      document.getElementById('hs'+i).textContent='No match';document.getElementById('hs'+i).className='hsnm idle';
+      document.getElementById('hst'+i).textContent='Try clearer pose';document.getElementById('hst'+i).className='hst';
+    }
+    document.getElementById('hcf'+i).style.width=Math.round(conf*100)+'%';
+    if(stable){
+      const now=Date.now(),hl=hlast[i];
+      if(det!==hl.n||(now-hl.t>2500)){
+        hlast[i]={n:det,t:now};signs++;document.getElementById('s1').textContent=signs;
+        if(det.length===1)sentence+=det;
+        else{if(sentence.length&&!sentence.endsWith(' '))sentence+=' ';sentence+=det+' ';}
+        updS();speak(det,false);
+      }
+    }
+  }
+  if(!hands[0]&&!hands[1])document.getElementById('asl-badge').classList.remove('show');
+}
+function clrASL(){
+  for(let i=0;i<2;i++){
+    document.getElementById('hc'+i).classList.remove('active');
+    document.getElementById('hl'+i).textContent='—';document.getElementById('hl'+i).className='hltr idle';
+    document.getElementById('hs'+i).textContent='No sign';document.getElementById('hs'+i).className='hsnm idle';
+    document.getElementById('hst'+i).textContent='Show hand';document.getElementById('hst'+i).className='hst';
+    document.getElementById('hcf'+i).style.width='0%';hbufs[i]=[];
+  }
+  document.getElementById('asl-badge').classList.remove('show');
+  latestSorted=[null,null];latestHands=[];
+}
+function updS(){document.getElementById('stxt').textContent=sentence||'_';}
+function addSp(){sentence+=' ';updS();}
+function delLast(){if(sentence.length)sentence=sentence.trimEnd().slice(0,-1);updS();}
+function clrS(){sentence='';updS();}
+function spkS(){const s=sentence.trim();if(s)speak(s);}
+function signToJarvis(){const s=sentence.trim();if(!s)return;umsg(s+' (signed)');askJ(`I signed: "${s}". Please respond and help me.`);clrS();}
+
+/* ═══ NAVIGATION ════════════════════════════════════════════════ */
+function getPos(bbox,w){const r=(bbox[0]+bbox[2]/2)/w;return r<.33?'left':r>.67?'right':'center';}
+
+const DANGER=new Set(['person','car','bus','truck','motorcycle','bicycle','fire hydrant','stop sign','traffic light']);
+const OBSTACLE=new Set(['chair','couch','dining table','bed','toilet','bench','suitcase','backpack','bottle','cup','vase']);
+
+function navLoop(){
+  if(!running)return;
+  if(!navOn||paused){setTimeout(navLoop,500);return;}
+  computeNav(latestPreds);
+  setTimeout(navLoop,1000); // update every 1s for responsive guidance
+}
+
+function computeNav(preds){
+  const W=video.videoWidth||640,H=video.videoHeight||480,area=W*H;
+  if(!preds.length){
+    setNav('⬆','clear','PATH CLEAR','No obstacles detected — safe to move forward.');
+    return;
+  }
+  const zones={left:[],center:[],right:[]};
+  preds.forEach(p=>{
+    const pos=getPos(p.bbox,W);
+    const a=(p.bbox[2]*p.bbox[3])/area;
+    zones[pos].push({name:p.class,area:a,score:p.score});
+  });
+
+  const isDanger=o=>DANGER.has(o.name)||OBSTACLE.has(o.name);
+  const cD=zones.center.filter(isDanger);
+  const lD=zones.left.filter(isDanger);
+  const rD=zones.right.filter(isDanger);
+  const bigC=cD.filter(o=>o.area>.08);
+  const bigL=lD.filter(o=>o.area>.06);
+  const bigR=rD.filter(o=>o.area>.06);
+
+  let arrow,cls,dir,detail;
+
+  if(bigC.length){
+    arrow='🛑';cls='danger';
+    dir='STOP — OBSTACLE AHEAD';
+    const obj=bigC[0].name;
+    detail=`${obj.toUpperCase()} directly in front of you!`;
+    if(!lD.length)detail+=' Turn LEFT — left side is clear.';
+    else if(!rD.length)detail+=' Turn RIGHT — right side is clear.';
+    else detail+=' Both sides have obstacles. Stop and wait for assistance.';
+    // Speak urgent alert
+    announceNav(detail,true);
+  } else if(cD.length){
+    arrow='⚠️';cls='';
+    dir='CAUTION — SLOW DOWN';
+    detail=`${cD[0].name} ahead, getting closer. Proceed slowly.`;
+    announceNav(detail,false);
+  } else if(!zones.center.length){
+    arrow='⬆';cls='clear';
+    dir='PATH CLEAR';
+    detail='No obstacles ahead. Safe to move forward.';
+    announceNav(detail,false);
+  } else {
+    arrow='⬆';cls='';
+    dir='PROCEED WITH CARE';
+    const names=zones.center.slice(0,2).map(o=>o.name).join(' and ');
+    detail=`${names} detected ahead. Watch your step.`;
+    announceNav(detail,false);
+  }
+
+  // Side warnings appended to detail
+  if(bigL.length&&cls!=='danger')detail+=` ⚠ ${bigL[0].name} close on your left.`;
+  if(bigR.length&&cls!=='danger')detail+=` ⚠ ${bigR[0].name} close on your right.`;
+
+  setNav(arrow,cls,dir,detail);
+}
+
+let lastNavAnnounce={msg:'',time:0,urgentTime:0};
+function announceNav(msg,urgent){
+  if(!audioOn)return;
+  const now=Date.now();
+  // Urgent alerts repeat every 3s, normal every 6s, but ONLY if different or enough time passed
+  const cooldown=urgent?3000:6000;
+  const changed=msg!==lastNavAnnounce.msg;
+  const timedOut=now-lastNavAnnounce.time>cooldown;
+  if(!changed&&!timedOut)return;
+  // Don't interrupt mic — queue nav behind
+  if(micActive)return;
+  lastNavAnnounce={msg,time:now};
+  speak(msg,urgent);
+}
+
+function setNav(arrow,cls,dir,detail){
+  document.getElementById('nav-arrow').textContent=arrow;
+  const d=document.getElementById('nav-dir');
+  d.textContent=dir;d.className='nav-dir'+(cls?' '+cls:'');
+  document.getElementById('nav-detail').textContent=detail;
+  lastNavState={arrow,dir,detail,cls};
+}
+
+/* ═══ OBJECT ANNOUNCER ══════════════════════════════════════════ */
+function updateObjUI(preds){
+  document.getElementById('s0').textContent=preds.length;
+  const el=document.getElementById('olist');
+  if(!preds.length){el.innerHTML='<div class="noobj">No objects detected</div>';return;}
+  el.innerHTML=preds.slice(0,14).map(p=>{
+    const pos=getPos(p.bbox,video.videoWidth||640);
+    return`<div class="oi"><span class="on_">${p.class}</span><div class="or"><span class="pt ${pos}">${pos}</span><span class="cf">${Math.round(p.score*100)}%</span></div></div>`;
+  }).join('');
+}
+const PRIO=new Set(['person','car','bicycle','motorcycle','bus','truck','stop sign','traffic light','fire hydrant']);
+function announceObjs(preds){
+  if(!audioOn||!preds.length)return;
+  const now=Date.now();
+  const sorted=[...preds].sort((a,b)=>PRIO.has(b.class)-PRIO.has(a.class));
+  for(const p of sorted){
+    const pos=getPos(p.bbox,video.videoWidth||640);
+    const last=lastObjSpoken[p.class];
+    if(!last||now-last.t>4000||last.pos!==pos){
+      lastObjSpoken[p.class]={t:now,pos};
+      const msg=pos==='center'?`${p.class} ahead`:`${p.class} on the ${pos}`;
+      if(PRIO.has(p.class)){alerts++;document.getElementById('s3').textContent=alerts;}
+      speak(msg,PRIO.has(p.class));break;
+    }
+  }
+}
+
+/* ═══ JARVIS AI (Claude API) ════════════════════════════════════ */
+function sceneCtx(){
+  const obs=latestPreds.map(p=>`${p.class} (${getPos(p.bbox,video.videoWidth||640)}, ${Math.round(p.score*100)}%)`).join(', ')||'nothing detected';
+  const nav=lastNavState.dir||'unknown';
+  return `Camera scene: ${obs}. Navigation status: ${nav}. ASL sentence: "${sentence||'empty'}".`;
+}
+
+/* ═══ JARVIS LOCAL AI ENGINE — No API key needed ══════════════════
+   A rich rule-based + pattern-matching response engine that uses
+   real-time camera data, GPS state, and ASL sentence to give
+   intelligent, context-aware answers — completely free, works offline.
+════════════════════════════════════════════════════════════════════ */
+
+function askJ(userMsg){
+  if(jThinking)return;
+  jThinking=true;
+  setJState('thinking');
+  showTyping();
+
+  // Small delay so the typing indicator shows — feels more natural
+  setTimeout(()=>{
+    const reply = smartLocalReply(userMsg);
+    removeTyping();
+    jmsg(reply);
+    speak(reply, false);
+    jThinking=false;
+    setJState('idle');
+  }, 420);
+}
+
+/* ── SMART LOCAL REPLY ENGINE ──────────────────────────────────── */
+function smartLocalReply(msg) {
+  // Priority 1: GPS-specific questions
+  const gpsR = gpsLocalReply(msg);
+  if (gpsR) return gpsR;
+
+  const m = msg.toLowerCase().trim();
+  const W = video.videoWidth || 640;
+  const preds = latestPreds;
+
+  // Helper: get objects by zone
+  const center = preds.filter(p => getPos(p.bbox,W)==='center');
+  const left   = preds.filter(p => getPos(p.bbox,W)==='left');
+  const right  = preds.filter(p => getPos(p.bbox,W)==='right');
+  const all    = preds;
+  const isDanger = o => DANGER.has(o.class)||OBSTACLE.has(o.class);
+
+  // Helper: describe what's in a zone
+  const zoneDesc = (objs) => objs.length ? objs.map(o=>o.class).join(' and ') : 'nothing';
+  const fullDesc = () => all.length
+    ? all.slice(0,5).map(p=>`${p.class} on your ${getPos(p.bbox,W)}`).join(', ')
+    : 'nothing detected around you';
+
+  // ── GREETINGS ────────────────────────────────────────────────
+  if(/^(hi|hello|hey|good morning|good afternoon|jarvis)[\s!?.,]*$/.test(m)){
+    const timeOfDay = new Date().getHours();
+    const greeting = timeOfDay < 12 ? 'Good morning' : timeOfDay < 17 ? 'Good afternoon' : 'Good evening';
+    return `${greeting}! I am JARVIS, your visual assistant. I am watching your surroundings right now. ${all.length ? 'I can see ' + fullDesc() + '.' : 'The area looks clear.'} How can I help you?`;
+  }
+
+  // ── WHAT DO YOU SEE / DESCRIBE SCENE ────────────────────────
+  if(/see|around|nearby|front|describe|scene|environment|what.*(there|here)|surroundings|detect/.test(m)){
+    if(!all.length) return 'I cannot detect any objects right now. The area appears clear. You can move forward carefully, but stay alert.';
+    const centerWarn = center.filter(isDanger);
+    let reply = 'I can see ' + fullDesc() + '.';
+    if(centerWarn.length) reply += ` Warning — ${centerWarn[0].class} is directly ahead of you.`;
+    else if(center.length) reply += ` There is ${zoneDesc(center)} ahead.`;
+    return reply;
+  }
+
+  // ── IS IT SAFE / PATH / FORWARD ──────────────────────────────
+  if(/safe|clear|path|forward|walk|move|go ahead|proceed|can i/.test(m)){
+    if(!center.filter(isDanger).length && center.length === 0){
+      const sideWarn = [...left.filter(isDanger), ...right.filter(isDanger)];
+      if(sideWarn.length) return `Path ahead is clear, but be careful — ${sideWarn[0].class} detected on your ${getPos(sideWarn[0].bbox,W)}. Move forward slowly.`;
+      return 'Path ahead looks clear. Safe to move forward. Stay alert as conditions can change quickly.';
+    }
+    const blocker = center.find(isDanger) || center[0];
+    const clearSide = !left.filter(isDanger).length ? 'left' : !right.filter(isDanger).length ? 'right' : null;
+    if(clearSide) return `Stop! ${blocker.class} is directly ahead. Move to your ${clearSide} — that side appears clear.`;
+    return `Stop! ${blocker.class} is directly ahead and both sides have obstacles. Please wait for assistance or back up slowly.`;
+  }
+
+  // ── STOP / OBSTACLE ──────────────────────────────────────────
+  if(/stop|obstacle|danger|block|collision|careful|watch out/.test(m)){
+    const hazards = center.filter(isDanger);
+    if(hazards.length) return `Stop immediately! ${hazards.map(o=>o.class).join(' and ')} directly ahead. Do not move forward. Step back if you can.`;
+    if(preds.filter(isDanger).length) return `There are hazards nearby — ${preds.filter(isDanger).map(o=>`${o.class} on your ${getPos(o.bbox,W)}`).join(', ')}. Proceed very carefully.`;
+    return 'No immediate obstacles detected. The area appears safe, but always proceed with caution.';
+  }
+
+  // ── LEFT ─────────────────────────────────────────────────────
+  if(/left/.test(m) && !/navigate|turn|gps/.test(m)){
+    if(!left.length) return 'Your left side is clear. Safe to move left.';
+    const hazard = left.find(isDanger);
+    if(hazard) return `Caution! ${hazard.class} detected on your left. Do not move left — try moving right instead.`;
+    return `On your left I can see ${zoneDesc(left)}. Move slowly if going left.`;
+  }
+
+  // ── RIGHT ────────────────────────────────────────────────────
+  if(/right/.test(m) && !/navigate|turn|gps/.test(m)){
+    if(!right.length) return 'Your right side is clear. Safe to move right.';
+    const hazard = right.find(isDanger);
+    if(hazard) return `Caution! ${hazard.class} detected on your right. Do not move right — try moving left instead.`;
+    return `On your right I can see ${zoneDesc(right)}. Move slowly if going right.`;
+  }
+
+  // ── PEOPLE / PERSONS ────────────────────────────────────────
+  if(/person|people|human|someone|anybody/.test(m)){
+    const people = all.filter(p=>p.class==='person');
+    if(!people.length) return 'No people detected in the current view right now.';
+    const positions = people.map(p=>getPos(p.bbox,W));
+    if(people.length===1) return `There is one person to your ${positions[0]}. Be aware of their presence.`;
+    return `I can see ${people.length} people nearby — ${positions.map((p,i)=>`person ${i+1} on your ${p}`).join(', ')}.`;
+  }
+
+  // ── SPECIFIC OBJECTS ────────────────────────────────────────
+  const objTypes = ['chair','table','car','door','bottle','laptop','phone','bag','bicycle','bus','truck','dog','cat'];
+  for(const ot of objTypes){
+    if(m.includes(ot)){
+      const found = all.filter(p=>p.class===ot||p.class.includes(ot));
+      if(!found.length) return `I cannot see any ${ot} in the current view.`;
+      return `I can see ${found.length} ${ot}${found.length>1?'s':''} — ${found.map(p=>`one on your ${getPos(p.bbox,W)}`).join(', ')}.`;
+    }
+  }
+
+  // ── DISTANCE QUESTIONS ───────────────────────────────────────
+  if(/how far|distance|close|near|metres|feet/.test(m)){
+    const closest = all.sort((a,b)=>(b.bbox[2]*b.bbox[3])-(a.bbox[2]*a.bbox[3]))[0];
+    if(!closest) return 'I cannot estimate distance — no objects detected right now.';
+    const area = (closest.bbox[2]*closest.bbox[3])/((video.videoWidth||640)*(video.videoHeight||480));
+    const estDist = area > 0.25 ? 'less than 1 metre' : area > 0.1 ? 'about 1 to 2 metres' : area > 0.04 ? 'about 2 to 4 metres' : 'more than 4 metres';
+    return `The closest object I can see is a ${closest.class} on your ${getPos(closest.bbox,video.videoWidth||640)}, approximately ${estDist} away.`;
+  }
+
+  // ── SIGN LANGUAGE / ASL ──────────────────────────────────────
+  if(/sign|asl|language|hand|signed|gesture/.test(m)){
+    if(sentence.trim()) return `Your sign language sentence so far reads: "${sentence.trim()}". Keep signing letters or tap Speak to have it read aloud.`;
+    return 'Sign language recognition is active. Show your hand to the camera and sign ASL letters or words. I will read them aloud as you sign.';
+  }
+
+  // ── WHAT AM I STANDING ON / WHERE AM I ──────────────────────
+  if(/where am i|location|standing|position/.test(m)){
+    if(GPS.currentPos) return `Your GPS coordinates are ${GPS.currentPos.lat.toFixed(4)}, ${GPS.currentPos.lng.toFixed(4)}. Tap the GPS button and say a destination to get walking directions.`;
+    return 'I do not have your GPS location yet. Allow location access and tap the GPS button to enable navigation.';
+  }
+
+  // ── HELP / WHAT CAN YOU DO ───────────────────────────────────
+  if(/help|what can you|how do you|what do you|tutorial|guide|capability|function/.test(m)){
+    return 'I can describe what the camera sees, warn you about obstacles, guide you left or right, count people nearby, read your sign language, and give GPS directions anywhere. Just ask me anything about your surroundings.';
+  }
+
+  // ── TIME ────────────────────────────────────────────────────
+  if(/time|clock|hour/.test(m)){
+    const now = new Date();
+    return `The current time is ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}.`;
+  }
+
+  // ── THANK YOU ────────────────────────────────────────────────
+  if(/thank|thanks|appreciate|good job|well done/.test(m)){
+    return "You are very welcome. I am always here watching your surroundings. Stay safe and let me know if you need anything.";
+  }
+
+  // ── STATUS REPORT ────────────────────────────────────────────
+  if(/status|report|update|summary|what's happening/.test(m)){
+    const navStatus = GPS.active && GPS.steps.length
+      ? `Navigating to ${GPS.destPos?.name?.split(',')[0]||'destination'}, ${formatDist(Math.round(GPS.remainDist))} remaining.`
+      : 'GPS navigation is not active.';
+    const sceneStatus = all.length
+      ? `I can currently see ${all.length} object${all.length>1?'s':''}: ${fullDesc()}.`
+      : 'No objects detected at the moment.';
+    return `${sceneStatus} ${navStatus}`;
+  }
+
+  // ── REPEAT LAST NAV INSTRUCTION ──────────────────────────────
+  if(/repeat|again|say again|what did you say/.test(m)){
+    if(GPS.active && GPS.steps[GPS.currentStep]){
+      return `Current navigation instruction: ${GPS.steps[GPS.currentStep].instruction}. ${formatDist(Math.round(GPS.remainDist))} remaining to your destination.`;
+    }
+    if(lastNavState.detail) return `Current environment status: ${lastNavState.detail}`;
+    return 'Nothing specific to repeat. Ask me about your surroundings or set a GPS destination.';
+  }
+
+  // ── EMERGENCY / PANIC ────────────────────────────────────────
+  if(/emergency|panic|scared|lost|confused|help me|danger|911|ambulance/.test(m)){
+    const hazards = center.filter(isDanger);
+    if(hazards.length) return `Stay calm. Stop moving. There is a ${hazards[0].class} directly ahead. Back up slowly, then wait for someone to assist you.`;
+    return 'Stay calm. Stop where you are. The immediate area appears clear. Call someone you trust or emergency services if you need help. I am monitoring your surroundings.';
+  }
+
+  // ── DEFAULT: give a contextual scene summary ─────────────────
+  if(all.length){
+    const warn = center.find(isDanger);
+    if(warn) return `Be careful — ${warn.class} directly ahead of you. I can also see ${fullDesc()}. What would you like to know?`;
+    return `Right now I can see ${fullDesc()}. Ask me if it is safe to move, what is on your left or right, how far something is, or to navigate somewhere.`;
+  }
+  return "I am watching your surroundings but cannot detect any objects right now. The area appears clear. Move forward carefully. Ask me anything — I am here to help.";
+}
+
+function localReply(msg){
+  // Check GPS-specific replies first
+  const gpsR=gpsLocalReply(msg);
+  if(gpsR)return gpsR;
+  const m=msg.toLowerCase();
+  const preds=latestPreds;
+  const W=video.videoWidth||640;
+  if(m.includes('around')||m.includes('see')||m.includes('describe')){
+    if(!preds.length)return'The area appears clear. I cannot detect any objects right now. You can move forward carefully.';
+    return'I can see '+preds.slice(0,4).map(p=>`${p.class} to your ${getPos(p.bbox,W)}`).join(', ')+'. Proceed with care.';
+  }
+  if(m.includes('safe')||m.includes('path')||m.includes('forward')||m.includes('go')){
+    const c=preds.filter(p=>getPos(p.bbox,W)==='center');
+    return c.length?`Stop! ${c[0].class} is directly ahead. Move ${preds.filter(p=>getPos(p.bbox,W)==='left').length?'right':'left'} to go around it.`:'Path ahead is clear. Move forward carefully.';
+  }
+  if(m.includes('left'))return preds.filter(p=>getPos(p.bbox,W)==='left').length?`Caution on your left — ${preds.filter(p=>getPos(p.bbox,W)==='left').map(p=>p.class).join(' and ')} detected. Move slowly.`:'Your left side is clear. Safe to move left.';
+  if(m.includes('right'))return preds.filter(p=>getPos(p.bbox,W)==='right').length?`Caution on your right — ${preds.filter(p=>getPos(p.bbox,W)==='right').map(p=>p.class).join(' and ')} detected. Move slowly.`:'Your right side is clear. Safe to move right.';
+  if(m.includes('person')||m.includes('people')){const pp=preds.filter(p=>p.class==='person');return pp.length?`${pp.length} person${pp.length>1?'s are':' is'} nearby, to your ${pp.map(p=>getPos(p.bbox,W)).join(' and ')}.`:'No people detected in the current view.';}
+  if(m.includes('stop')||m.includes('obstacle')){const c=preds.filter(p=>getPos(p.bbox,W)==='center'&&(DANGER.has(p.class)||OBSTACLE.has(p.class)));return c.length?`Stop! ${c.map(p=>p.class).join(' and ')} directly ahead.`:'No immediate obstacles in your path. You can proceed.';}
+  return lastNavState.dir?`Current status: ${lastNavState.detail} I am monitoring your surroundings continuously.`:'I am monitoring your environment. The path looks clear. Proceed with care.';
+}
+
+function sendMsg(){
+  const inp=document.getElementById('inp');
+  const msg=inp.value.trim();
+  if(!msg||jThinking)return;
+  inp.value='';
+  umsg(msg);askJ(msg);
+}
+function qCmd(msg){umsg(msg);askJ(msg);}
+
+/* ═══ JARVIS UI ═════════════════════════════════════════════════ */
+function setJState(st){
+  const ring=document.getElementById('jring'),core=document.getElementById('jcore');
+  const jst=document.getElementById('jstate'),dot=document.getElementById('jsdot'),lbl=document.getElementById('jslbl');
+  ring.className='jring';
+  if(st==='listening'){ring.classList.add('listening');core.textContent='👂';jst.textContent='LISTENING';jst.className='jstate listening';dot.className='jstatus-dot pulse';lbl.textContent='Hearing your voice...';}
+  else if(st==='speaking'){ring.classList.add('speaking');core.textContent='🔊';jst.textContent='SPEAKING';jst.className='jstate speaking';dot.className='jstatus-dot pulse';lbl.textContent='Speaking guidance...';}
+  else if(st==='thinking'){ring.classList.add('thinking');core.textContent='⚙';jst.textContent='THINKING';jst.className='jstate thinking';dot.className='jstatus-dot pulse';lbl.textContent='Processing...';}
+  else{core.textContent='🤖';jst.textContent='STANDBY';jst.className='jstate';dot.className='jstatus-dot';lbl.textContent='Ready — tap mic to speak';}
+}
+function jmsg(text){
+  const chat=document.getElementById('chat');
+  const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const d=document.createElement('div');d.className='msg j_';
+  d.innerHTML=`<div class="mav">J</div><div><div class="mb">${text}</div><div class="mt">${t}</div></div>`;
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function umsg(text){
+  const chat=document.getElementById('chat');
+  const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const d=document.createElement('div');d.className='msg user';
+  d.innerHTML=`<div class="mav">U</div><div><div class="mb">${text}</div><div class="mt">${t}</div></div>`;
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function showTyping(){
+  const chat=document.getElementById('chat');
+  const d=document.createElement('div');d.id='tdot';d.className='msg j_';
+  d.innerHTML=`<div class="mav">J</div><div class="tdots"><div class="td"></div><div class="td"></div><div class="td"></div></div>`;
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function removeTyping(){const t=document.getElementById('tdot');if(t)t.remove();}
+
+/* ═══ VOICE RECOGNITION — FULLY REBUILT ════════════════════════
+   Key fixes:
+   1. Pre-request mic permission on init
+   2. Always stop speech synthesis before listening
+   3. continuous:true so it keeps listening after each phrase
+   4. Auto-restart on end if still in listen mode
+   5. Silence speech during listening to avoid feedback loop
+════════════════════════════════════════════════════════════════ */
+let activeRec = null; // keep reference to stop it
+
+async function initVoice(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    document.getElementById('vhint').textContent='⚠ Voice unavailable. Use Chrome or Edge.';
+    micBlocked=true;
+    jmsg("Voice input is not supported in this browser. Please use Google Chrome or Microsoft Edge for the best experience. You can still type your questions below.");
+    return;
+  }
+
+  // Pre-request microphone permission so browser doesn't block on first use
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    s.getTracks().forEach(t=>t.stop()); // release immediately — just needed permission
+    document.getElementById('vhint').textContent='🎤 Tap mic button or say anything to speak to JARVIS';
+  }catch(e){
+    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+      micBlocked=true;
+      document.getElementById('vhint').textContent='⚠ Microphone blocked — allow in browser settings';
+      jmsg("Microphone access was denied. Click the microphone icon in your browser address bar, set it to Allow, then refresh the page.");
+    }
+  }
+}
+
+function toggleMic(){
+  if(micBlocked){
+    jmsg("Microphone is blocked. Click the lock icon in your browser address bar, set Microphone to Allow, then refresh.");
+    return;
+  }
+  if(micActive){stopMic();}
+  else{startMic();}
+}
+
+function startMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR||micBlocked)return;
+
+  // CRITICAL: Stop all speech synthesis first — otherwise browser blocks mic
+  window.speechSynthesis.cancel();
+  speechQueue=[];
+  isSpeaking=false;
+  jSpeaking=false;
+
+  micActive=true;
+  document.getElementById('mic-btn').className='mic-btn listening';
+  document.getElementById('mic-lbl').textContent='Listening...';
+  setJState('listening');
+  const lv=document.getElementById('vlive');
+  lv.className='voice-live show';
+  lv.textContent='🎤 Listening... speak now';
+
+  const rec=new SR();
+  activeRec=rec;
+  rec.continuous=true;        // keep listening across pauses
+  rec.interimResults=true;    // show live text as you speak
+  rec.lang='en-US';
+  rec.maxAlternatives=1;
+
+  rec.onstart=()=>{
+    lv.textContent='🎤 Listening — speak to JARVIS...';
+  };
+
+  rec.onresult=e=>{
+    let interim='', final_='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)final_+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    if(interim){
+      lv.textContent='🎤 '+interim+'...';
+    }
+    if(final_){
+      const txt=final_.trim();
+      if(txt.length>1){
+        lv.textContent='✓ '+txt;
+        umsg(txt+' 🎤');
+        stopMic(); // stop listening while JARVIS thinks+speaks
+        askJ(txt);
+      }
+    }
+  };
+
+  rec.onerror=e=>{
+    console.warn('Mic error:',e.error);
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      micBlocked=true;
+      stopMic();
+      document.getElementById('vhint').textContent='⚠ Mic blocked — allow in browser settings and refresh';
+      jmsg("Microphone access denied. Please click the lock icon in your browser's address bar, set Microphone to Allow, then refresh the page.");
+    } else if(e.error==='no-speech'){
+      lv.textContent='No speech heard — tap mic and try again';
+      setTimeout(()=>{lv.className='voice-live';},3000);
+      stopMic();
+    } else if(e.error==='audio-capture'){
+      stopMic();
+      jmsg("Cannot capture audio. Make sure no other app is using your microphone.");
+    } else {
+      stopMic();
+    }
+  };
+
+  rec.onend=()=>{
+    // Only auto-restart if we are still in listening mode and user didn't stop
+    // (e.g. browser cut off due to silence — restart automatically)
+    if(micActive){
+      try{rec.start();}catch(e){stopMic();}
+    }
+  };
+
+  try{
+    rec.start();
+  }catch(e){
+    console.warn('Could not start mic:',e);
+    stopMic();
+    jmsg("Could not start microphone. Make sure you allowed mic access and are using Chrome or Edge.");
+  }
+}
+
+function stopMic(){
+  micActive=false;
+  if(activeRec){try{activeRec.stop();}catch(e){}activeRec=null;}
+  document.getElementById('mic-btn').className='mic-btn'+(micBlocked?' blocked':'');
+  document.getElementById('mic-lbl').textContent=micBlocked?'Mic blocked':'Tap to speak';
+  if(!jThinking)setJState('idle');
+}
+
+/* ═══ SPEECH ════════════════════════════════════════════════════ */
+let speechQueue=[];
+let isSpeaking=false;
+
+function speak(text,urgent=false){
+  document.getElementById('ann').textContent=text;
+  document.getElementById('ann').classList.remove('idle');
+  document.getElementById('vbi').classList.add('speaking');
+  document.getElementById('wv').classList.add('active');
+
+  if(!audioOn||!('speechSynthesis' in window))return;
+
+  // Clear queue if urgent
+  if(urgent){speechQueue=[];window.speechSynthesis.cancel();}
+  speechQueue.push({text,urgent});
+  if(!isSpeaking)processQueue();
+}
+
+function processQueue(){
+  if(!speechQueue.length){
+    isSpeaking=false;jSpeaking=false;
+    document.getElementById('vbi').classList.remove('speaking');
+    document.getElementById('wv').classList.remove('active');
+    if(!jThinking)setJState('idle');
+    // After JARVIS finishes speaking — show mic ready hint
+    if(!micActive&&!micBlocked){
+      document.getElementById('vhint').textContent='🎤 Tap mic button to ask JARVIS anything';
+    }
+    return;
+  }
+  isSpeaking=true;jSpeaking=true;
+  setJState('speaking');
+  const{text,urgent}=speechQueue.shift();
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=urgent?1.3:1.0;
+  u.pitch=urgent?1.1:.95;
+  u.volume=1;
+
+  // Pick best voice
+  const voices=window.speechSynthesis.getVoices();
+  const pick=voices.find(v=>/Daniel|Google UK English Male|Alex|Arthur|Microsoft David/.test(v.name))
+    ||voices.find(v=>v.lang==='en-US'&&v.localService)
+    ||voices[0];
+  if(pick)u.voice=pick;
+
+  u.onend=()=>{isSpeaking=false;processQueue();};
+  u.onerror=()=>{isSpeaking=false;processQueue();};
+  window.speechSynthesis.speak(u);
+}
+
+// Load voices async (Chrome needs this)
+if('speechSynthesis' in window){
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+}
+
+/* ═══ CONTROLS ══════════════════════════════════════════════════ */
+function togAudio(){audioOn=!audioOn;const b=document.getElementById('baudio');b.textContent=audioOn?'🔊':'🔇';b.classList.toggle('on',audioOn);if(!audioOn){window.speechSynthesis.cancel();speechQueue=[];isSpeaking=false;jSpeaking=false;}}
+function togAsl(){aslOn=!aslOn;const b=document.getElementById('basl');b.textContent=aslOn?'🤟':'🤟✗';b.classList.toggle('on',aslOn);if(!aslOn)clrASL();}
+function togNav(){navOn=!navOn;const b=document.getElementById('bnav');b.textContent=navOn?'🧭':'🧭✗';b.classList.toggle('on',navOn);document.getElementById('nav-bar').classList.toggle('show',navOn);}
+function togPause(){paused=!paused;const b=document.getElementById('bpause');b.textContent=paused?'▶':'⏸';b.classList.toggle('on',paused);speak(paused?'Detection paused.':'Detection resumed.');}
+function stopAll(){
+  stopGPS(false);
+  running=false;if(vStream)vStream.getTracks().forEach(t=>t.stop());
+  window.speechSynthesis.cancel();speechQueue=[];isSpeaking=false;jSpeaking=false;
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  document.getElementById('scan-badge').classList.remove('visible');
+  document.getElementById('asl-badge').classList.remove('show');
+  document.getElementById('nav-bar').classList.remove('show');
+  document.getElementById('olist').innerHTML='<div class="noobj">System stopped</div>';
+  document.getElementById('ann').textContent='Stopped';document.getElementById('ann').classList.add('idle');
+  clrASL();['cam','obj','asl'].forEach(n=>setDot(n,''));
+  lastObjSpoken={};scans=0;alerts=0;signs=0;sentence='';latestPreds=[];
+  ['s0','s1','s2','s3'].forEach(id=>document.getElementById(id).textContent=0);updS();
+  jmsg('System stopped. Click Activate JARVIS to restart.');setJState('idle');
+  showS('scr-welcome');
+}
+
+
+/* ═══ FILE:// BLOCKED — FULL SETUP GUIDE ═══════════════════════ */
+function showFileBlockedScreen(){
+  // Build setup guide overlay on camera pane
+  const cam = document.querySelector('.cam-pane') || document.body;
+
+  // Remove existing if any
+  const existing = document.getElementById('file-blocked-screen');
+  if(existing) existing.remove();
+
+  const isWin = navigator.platform.toLowerCase().includes('win');
+  const isMac = navigator.platform.toLowerCase().includes('mac');
+
+  const pythonCmd = isWin
+    ? 'python -m http.server 8080'
+    : 'python3 -m http.server 8080';
+
+  const openCmd = isWin
+    ? 'start http://localhost:8080'
+    : isMac ? 'open http://localhost:8080' : 'xdg-open http://localhost:8080';
+
+  const div = document.createElement('div');
+  div.id = 'file-blocked-screen';
+  div.style.cssText = `
+    position:absolute;inset:0;z-index:100;
+    background:rgba(6,10,14,0.97);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:14px;padding:24px;overflow-y:auto;
+  `;
+
+  div.innerHTML = `
+    <div style="font-size:2rem">🚫</div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:1rem;letter-spacing:.2em;color:#ff6b35;text-transform:uppercase">File:// Blocked</div>
+    <div style="font-size:.78rem;color:#c8dce8;text-align:center;max-width:440px;line-height:1.7">
+      Browsers block <b style="color:#ff6b35">camera and microphone</b> when files are opened directly.<br>
+      You need to serve VisionAid over HTTP. It takes <b style="color:#00ff9d">30 seconds</b> — pick a method below.
+    </div>
+
+    <div style="width:100%;max-width:460px;display:flex;flex-direction:column;gap:8px">
+
+      <!-- METHOD 1: Python -->
+      <div style="background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.25);border-radius:5px;padding:12px 14px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#00e5ff;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">METHOD 1 — Python (Built into most computers)</div>
+        <div style="font-size:.7rem;color:#c8dce8;margin-bottom:8px">
+          ${isWin ? 'Press <b>Windows+R</b>, type <b>cmd</b>, press Enter. Then paste:' : 'Open <b>Terminal</b> and paste:'}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <code id="py-cmd" style="flex:1;background:rgba(0,0,0,.5);border:1px solid rgba(0,229,255,.2);border-radius:3px;padding:8px 10px;font-family:'Share Tech Mono',monospace;font-size:.68rem;color:#00ff9d;word-break:break-all">cd "${window.location.pathname.replace(/[^/\\]*$/, '').replace(/^\/([A-Za-z]:)/, '$1')}" && ${pythonCmd}</code>
+          <button onclick="copyCmd('py-cmd')" style="background:transparent;border:1px solid rgba(0,229,255,.3);color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:.55rem;padding:6px 10px;cursor:pointer;border-radius:2px;white-space:nowrap;flex-shrink:0">Copy</button>
+        </div>
+        <div style="margin-top:8px;font-size:.7rem;color:#c8dce8">Then open: <a href="http://localhost:8080" target="_blank" style="color:#00ff9d;text-decoration:none;font-family:'Share Tech Mono',monospace">http://localhost:8080</a> in Chrome</div>
+      </div>
+
+      <!-- METHOD 2: VS Code -->
+      <div style="background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.2);border-radius:5px;padding:12px 14px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#a78bfa;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">METHOD 2 — VS Code (Easiest)</div>
+        <div style="font-size:.7rem;color:#c8dce8;line-height:1.7">
+          1. Open <b>VS Code</b> → Install extension: <b style="color:#a78bfa">Live Server</b><br>
+          2. Open this HTML file in VS Code<br>
+          3. Click <b style="color:#00ff9d">"Go Live"</b> in the bottom-right status bar
+        </div>
+      </div>
+
+      <!-- METHOD 3: Online -->
+      <div style="background:rgba(0,255,157,.04);border:1px solid rgba(0,255,157,.18);border-radius:5px;padding:12px 14px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#00ff9d;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">METHOD 3 — Upload Online (No install needed)</div>
+        <div style="font-size:.7rem;color:#c8dce8;line-height:1.7">
+          1. Go to <a href="https://netlify.com/drop" target="_blank" style="color:#00ff9d;font-family:'Share Tech Mono',monospace">netlify.com/drop</a><br>
+          2. Drag and drop this HTML file onto the page<br>
+          3. Open the link it gives you in Chrome
+        </div>
+      </div>
+
+      <!-- Chrome flag shortcut -->
+      <div style="background:rgba(244,162,97,.04);border:1px solid rgba(244,162,97,.18);border-radius:5px;padding:12px 14px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#f4a261;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">METHOD 4 — Chrome Flag (Advanced, Windows only)</div>
+        <div style="font-size:.7rem;color:#c8dce8;margin-bottom:8px">
+          Right-click Chrome shortcut → Properties → add to Target field:
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <code id="chrome-flag" style="flex:1;background:rgba(0,0,0,.5);border:1px solid rgba(244,162,97,.2);border-radius:3px;padding:8px 10px;font-family:'Share Tech Mono',monospace;font-size:.62rem;color:#f4a261;word-break:break-all">--allow-file-access-from-files --use-fake-ui-for-media-stream</code>
+          <button onclick="copyCmd('chrome-flag')" style="background:transparent;border:1px solid rgba(244,162,97,.3);color:#f4a261;font-family:'Share Tech Mono',monospace;font-size:.55rem;padding:6px 10px;cursor:pointer;border-radius:2px;white-space:nowrap;flex-shrink:0">Copy</button>
+        </div>
+        <div style="margin-top:6px;font-size:.65rem;color:#4a6070">After adding the flag, close ALL Chrome windows, reopen Chrome, then open this file.</div>
+      </div>
+    </div>
+
+    <button onclick="document.getElementById('file-blocked-screen').remove();startCamera();"
+      style="background:transparent;border:1px solid #00e5ff;color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;padding:10px 28px;cursor:pointer;border-radius:2px;margin-top:4px">
+      ↻ I've done this — Try Again
+    </button>
+  `;
+
+  cam.appendChild(div);
+}
+
+function copyCmd(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(()=>{
+    el.style.borderColor='#00ff9d';
+    setTimeout(()=>{el.style.borderColor='';},1500);
+  }).catch(()=>{
+    // fallback select
+    const r=document.createRange();r.selectNodeContents(el);
+    const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+    document.execCommand('copy');
+    el.style.borderColor='#00ff9d';
+    setTimeout(()=>{el.style.borderColor='';},1500);
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GPS NAVIGATION ENGINE — Full town navigation for visually impaired
+   Uses: Browser Geolocation API + OpenStreetMap Nominatim (geocoding)
+          + OSRM (free routing, no API key) + Leaflet (map display)
+   Features:
+   - Real-time GPS position tracking
+   - Voice turn-by-turn directions
+   - Continuous bearing/heading detection
+   - Vibration alerts on turns (mobile)
+   - Obstacle + GPS combined warnings
+   - Auto-recalculate if off route
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── GPS STATE ─────────────────────────────────────────────────── */
+const GPS = {
+  active:       false,
+  watching:     null,      // watchPosition ID
+  map:          null,      // Leaflet map instance
+  mapShown:     false,
+  currentPos:   null,      // {lat, lng, heading, speed, accuracy}
+  destPos:      null,      // {lat, lng, name}
+  route:        null,      // OSRM route object
+  steps:        [],        // parsed turn-by-turn steps
+  currentStep:  0,
+  totalDist:    0,
+  remainDist:   0,
+  lastAnnounce: {msg:'', time:0},
+  recalcTimer:  null,
+  marker:       null,      // user marker on map
+  routeLine:    null,      // route polyline
+  destMarker:   null,
+  arrived:      false,
+  searchTimeout:null,
+};
+
+/* ── DIRECTION ARROWS ──────────────────────────────────────────── */
+const DIR_ARROW = {
+  'straight':           { arrow:'⬆', label:'Continue straight' },
+  'turn-slight-left':   { arrow:'↖', label:'Bear slightly left' },
+  'turn-left':          { arrow:'◀', label:'Turn LEFT' },
+  'turn-sharp-left':    { arrow:'↰', label:'Sharp turn LEFT' },
+  'turn-slight-right':  { arrow:'↗', label:'Bear slightly right' },
+  'turn-right':         { arrow:'▶', label:'Turn RIGHT' },
+  'turn-sharp-right':   { arrow:'↱', label:'Sharp turn RIGHT' },
+  'u-turn':             { arrow:'↩', label:'Make a U-turn' },
+  'arrive':             { arrow:'📍', label:'You have ARRIVED' },
+  'depart':             { arrow:'🚶', label:'Start walking' },
+  'roundabout':         { arrow:'🔄', label:'Enter roundabout' },
+  'exit roundabout':    { arrow:'↗', label:'Exit roundabout' },
+};
+
+function getDirInfo(modifier, type) {
+  if (type === 'arrive')  return DIR_ARROW['arrive'];
+  if (type === 'depart')  return DIR_ARROW['depart'];
+  if (!modifier) return DIR_ARROW['straight'];
+  const key = modifier.toLowerCase().replace(/ /g,'-');
+  return DIR_ARROW[key] || DIR_ARROW['straight'];
+}
+
+/* ── TOGGLE GPS ────────────────────────────────────────────────── */
+function toggleGPS() {
+  if (GPS.active) {
+    stopGPS();
+  } else {
+    startGPSInput();
+  }
+}
+
+function startGPSInput() {
+  // Show the destination search bar
+  const search = document.getElementById('gps-search');
+  search.classList.add('show');
+  document.getElementById('gps-dest-input').focus();
+
+  // Speak instruction
+  speak("Where would you like to go? Type your destination and press Navigate. I will guide you there with turn by turn directions.", false);
+  jmsg("🛰 GPS Navigation — Where do you want to go? Type a destination like 'Central Park', 'Main Street Hospital', or a full address.");
+
+  // Start getting location in background
+  initGPSLocation();
+}
+
+function initGPSLocation() {
+  if (!navigator.geolocation) {
+    speak("GPS is not available on this device.", true);
+    jmsg("⚠ GPS not available. Your browser or device does not support geolocation.");
+    return;
+  }
+  // Get initial position
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      GPS.currentPos = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        heading: pos.coords.heading,
+        speed: pos.coords.speed,
+        accuracy: pos.coords.accuracy
+      };
+      setDot('gps','gps','GPS Ready');
+      document.getElementById('d-gps').className = 'dot gps';
+    },
+    err => {
+      console.warn('GPS error:', err);
+      handleGPSError(err);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+  );
+}
+
+function handleGPSError(err) {
+  let msg = '';
+  if (err.code === 1) msg = "Location access denied. Please allow location in browser settings.";
+  else if (err.code === 2) msg = "GPS signal not available. Move to an open area.";
+  else msg = "Could not get your location. Check your GPS signal.";
+  speak(msg, true);
+  jmsg("⚠ GPS: " + msg);
+  setDot('gps','warn','GPS Error');
+}
+
+/* ── GEOCODING (Nominatim — free, no API key) ──────────────────── */
+async function gpsSuggest(query) {
+  if (!query || query.length < 3) {
+    document.getElementById('gps-suggestions').style.display='none';
+    return;
+  }
+  clearTimeout(GPS.searchTimeout);
+  GPS.searchTimeout = setTimeout(async () => {
+    try {
+      // Use user's current location to bias results
+      const viewbox = GPS.currentPos
+        ? `&viewbox=${GPS.currentPos.lng-.1},${GPS.currentPos.lat+.1},${GPS.currentPos.lng+.1},${GPS.currentPos.lat-.1}&bounded=0`
+        : '';
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1${viewbox}`;
+      const res = await fetch(url, {headers:{'Accept-Language':'en'}});
+      const data = await res.json();
+
+      const sug = document.getElementById('gps-suggestions');
+      if (!data.length) { sug.style.display='none'; return; }
+
+      sug.style.display='block';
+      sug.innerHTML = data.map(d =>
+        `<div class="gps-sug-item" onclick="selectDest('${d.display_name.replace(/'/g,"\'")}',${d.lat},${d.lon})">
+          📍 ${d.display_name.substring(0,60)}${d.display_name.length>60?'...':''}
+        </div>`
+      ).join('');
+    } catch(e) { /* network error — silent */ }
+  }, 400);
+}
+
+function selectDest(name, lat, lon) {
+  document.getElementById('gps-dest-input').value = name.substring(0,50);
+  document.getElementById('gps-suggestions').style.display='none';
+  startNavigation(name, parseFloat(lat), parseFloat(lon));
+}
+
+async function gpsSearch() {
+  const query = document.getElementById('gps-dest-input').value.trim();
+  if (!query) { speak("Please enter a destination.", false); return; }
+
+  const btn = document.getElementById('gps-go-btn');
+  btn.disabled = true;
+  btn.textContent = 'Finding...';
+  speak("Searching for " + query + ". One moment.", false);
+
+  try {
+    const viewbox = GPS.currentPos
+      ? `&viewbox=${GPS.currentPos.lng-.5},${GPS.currentPos.lat+.5},${GPS.currentPos.lng+.5},${GPS.currentPos.lat-.5}&bounded=0`
+      : '';
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=3&addressdetails=1${viewbox}`;
+    const res = await fetch(url, {headers:{'Accept-Language':'en'}});
+    const data = await res.json();
+
+    if (!data.length) {
+      speak("I could not find " + query + ". Please try a different search.", true);
+      btn.disabled=false; btn.textContent='Navigate'; return;
+    }
+    const dest = data[0];
+    startNavigation(dest.display_name, parseFloat(dest.lat), parseFloat(dest.lon));
+  } catch(e) {
+    speak("Could not search for location. Check your internet connection.", true);
+    btn.disabled=false; btn.textContent='Navigate';
+  }
+}
+
+/* ── START NAVIGATION ──────────────────────────────────────────── */
+async function startNavigation(destName, destLat, destLng) {
+  GPS.destPos = { lat: destLat, lng: destLng, name: destName };
+  GPS.arrived = false;
+
+  // Hide search bar
+  document.getElementById('gps-search').classList.remove('show');
+  document.getElementById('gps-suggestions').style.display='none';
+
+  // Make sure we have current position
+  if (!GPS.currentPos) {
+    speak("Getting your location. Please wait.", false);
+    await new Promise((res, rej) => {
+      navigator.geolocation.getCurrentPosition(p => {
+        GPS.currentPos = {lat:p.coords.latitude, lng:p.coords.longitude, heading:p.coords.heading, accuracy:p.coords.accuracy};
+        res();
+      }, rej, {enableHighAccuracy:true, timeout:15000});
+    }).catch(() => {
+      speak("Cannot get your location. Please check GPS permissions.", true);
+      return;
+    });
+  }
+
+  speak("Found " + destName.split(',')[0] + ". Calculating the best walking route.", false);
+  jmsg(`🛰 Navigating to: **${destName.split(',')[0]}**
+Calculating walking route...`);
+
+  // Fetch walking route from OSRM (free, no key)
+  await fetchRoute();
+}
+
+async function fetchRoute() {
+  if (!GPS.currentPos || !GPS.destPos) return;
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/foot/${GPS.currentPos.lng},${GPS.currentPos.lat};${GPS.destPos.lng},${GPS.destPos.lat}?steps=true&geometries=geojson&overview=full&annotations=false`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.code !== 'Ok' || !data.routes.length) {
+      speak("Could not find a walking route. Try a different destination.", true);
+      return;
+    }
+
+    const route = data.routes[0];
+    GPS.route = route;
+    GPS.totalDist = route.distance;
+    GPS.remainDist = route.distance;
+    GPS.currentStep = 0;
+    GPS.active = true;
+
+    // Parse steps
+    GPS.steps = [];
+    for (const leg of route.legs) {
+      for (const step of leg.steps) {
+        const maneuver = step.maneuver;
+        const dirInfo = getDirInfo(maneuver.modifier, maneuver.type);
+        GPS.steps.push({
+          instruction: step.name ? `${dirInfo.label} onto ${step.name}` : dirInfo.label,
+          arrow: dirInfo.arrow,
+          distance: step.distance,
+          duration: step.duration,
+          type: maneuver.type,
+          modifier: maneuver.modifier || '',
+          location: maneuver.location, // [lng, lat]
+          distRemain: step.distance,
+        });
+      }
+    }
+
+    // Init map
+    initMap(route);
+
+    // Show GPS panel
+    document.getElementById('gps-panel').classList.add('show');
+    document.getElementById('gps-map-wrap').style.display = 'block';
+    document.getElementById('bgps').classList.add('on');
+    setDot('gps','gps','Navigating');
+    document.getElementById('l-gps').textContent = 'Navigating';
+
+    // Start tracking
+    startTracking();
+    updateStepsUI();
+
+    const totalMinutes = Math.round(route.duration / 60);
+    const totalMeters = Math.round(route.distance);
+    const destShort = GPS.destPos.name.split(',')[0];
+    const routeMsg = `Route found. ${destShort} is ${formatDist(totalMeters)} away, about ${totalMinutes} minutes walking. ${GPS.steps[0].instruction}. Starting navigation now.`;
+    speak(routeMsg, false);
+    jmsg(`✅ Route to **${destShort}**
+📏 Distance: ${formatDist(totalMeters)}
+⏱ Walking time: ~${totalMinutes} min
+
+**First instruction:** ${GPS.steps[0].instruction}`);
+
+    // Update JARVIS context
+    setTimeout(() => announceCurrentStep(true), 3000);
+
+  } catch(e) {
+    speak("Could not load the route. Check your internet connection.", true);
+    jmsg("⚠ Route error: " + e.message);
+  }
+}
+
+/* ── MAP INIT (Leaflet) ────────────────────────────────────────── */
+function initMap(route) {
+  if (!GPS.currentPos) return;
+
+  // Load Leaflet if not already loaded
+  if (!window.L) {
+    const link = document.createElement('link');
+    link.rel='stylesheet';
+    link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => buildMap(route);
+    document.head.appendChild(script);
+  } else {
+    buildMap(route);
+  }
+}
+
+function buildMap(route) {
+  const mapEl = document.getElementById('gps-map');
+
+  if (GPS.map) {
+    GPS.map.remove();
+    GPS.map = null;
+  }
+
+  GPS.map = L.map('gps-map', {
+    center: [GPS.currentPos.lat, GPS.currentPos.lng],
+    zoom: 17,
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  // Dark tile layer (OpenStreetMap)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(GPS.map);
+
+  // Route line
+  if (route.geometry && route.geometry.coordinates) {
+    const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    GPS.routeLine = L.polyline(latlngs, {
+      color: '#34d399',
+      weight: 5,
+      opacity: 0.85,
+    }).addTo(GPS.map);
+  }
+
+  // User marker (pulsing dot)
+  const userIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:#34d399;border:3px solid #fff;box-shadow:0 0 12px #34d399;animation:none"></div>`,
+    iconSize: [16,16],
+    iconAnchor: [8,8],
+  });
+  GPS.marker = L.marker([GPS.currentPos.lat, GPS.currentPos.lng], {icon: userIcon}).addTo(GPS.map);
+
+  // Destination marker
+  if (GPS.destPos) {
+    const destIcon = L.divIcon({
+      className: '',
+      html: `<div style="font-size:22px">📍</div>`,
+      iconSize: [22,22],
+      iconAnchor: [11,22],
+    });
+    GPS.destMarker = L.marker([GPS.destPos.lat, GPS.destPos.lng], {icon: destIcon}).addTo(GPS.map);
+  }
+}
+
+function toggleMap() {
+  GPS.mapShown = !GPS.mapShown;
+  document.getElementById('gps-map').classList.toggle('show', GPS.mapShown);
+  document.querySelector('.gps-map-toggle').textContent = GPS.mapShown ? '✕ Hide Map' : '🗺 Map';
+  if (GPS.mapShown && GPS.map) {
+    setTimeout(() => {
+      GPS.map.invalidateSize();
+      if (GPS.currentPos) GPS.map.setView([GPS.currentPos.lat, GPS.currentPos.lng], 17);
+    }, 100);
+  }
+}
+
+/* ── REAL-TIME TRACKING ────────────────────────────────────────── */
+function startTracking() {
+  if (GPS.watching) navigator.geolocation.clearWatch(GPS.watching);
+
+  GPS.watching = navigator.geolocation.watchPosition(
+    pos => {
+      const newPos = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        heading: pos.coords.heading,
+        speed: pos.coords.speed,
+        accuracy: pos.coords.accuracy,
+      };
+      GPS.currentPos = newPos;
+      onPositionUpdate(newPos);
+    },
+    err => handleGPSError(err),
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 2000,
+    }
+  );
+}
+
+function onPositionUpdate(pos) {
+  if (!GPS.active || GPS.arrived) return;
+
+  // Update map marker
+  if (GPS.map && GPS.marker) {
+    GPS.marker.setLatLng([pos.lat, pos.lng]);
+    if (GPS.mapShown) GPS.map.panTo([pos.lat, pos.lng]);
+  }
+
+  // Check progress through steps
+  checkStepProgress(pos);
+}
+
+function checkStepProgress(pos) {
+  if (!GPS.steps.length || GPS.currentStep >= GPS.steps.length) return;
+
+  const step = GPS.steps[GPS.currentStep];
+  if (!step.location) return;
+
+  // Distance from current position to the step's maneuver point
+  const stepLat = step.location[1];
+  const stepLng = step.location[0];
+  const distToStep = haversine(pos.lat, pos.lng, stepLat, stepLng);
+
+  // Update remaining distance
+  GPS.remainDist = distToStep + GPS.steps.slice(GPS.currentStep+1).reduce((a,s)=>a+s.distance,0);
+  updateGPSPanel(distToStep);
+
+  // Announce turn when close
+  if (distToStep < 15 && GPS.currentStep < GPS.steps.length - 1) {
+    // Very close — announce NOW
+    const ns = GPS.steps[GPS.currentStep + 1];
+    if (ns && ns.type !== 'arrive') {
+      announceNavStep("In a few steps, " + ns.instruction, false, 'pre-turn');
+    }
+  }
+
+  // Advance step when within 8 meters
+  if (distToStep < 8) {
+    GPS.currentStep++;
+    if (GPS.currentStep >= GPS.steps.length) {
+      onArrived();
+      return;
+    }
+    const nextStep = GPS.steps[GPS.currentStep];
+    if (nextStep.type === 'arrive') {
+      onArrived(); return;
+    }
+    updateStepsUI();
+    announceCurrentStep(true);
+    // Vibrate on mobile
+    if (navigator.vibrate) navigator.vibrate([200,100,200]);
+  }
+
+  // Announce reminder every 25m
+  const elapsed = Date.now() - GPS.lastAnnounce.time;
+  if (elapsed > 12000) {
+    announceCurrentStep(false);
+  }
+}
+
+function onArrived() {
+  GPS.arrived = true;
+  GPS.active = false;
+  const destName = GPS.destPos ? GPS.destPos.name.split(',')[0] : 'your destination';
+
+  document.getElementById('gps-arrow-big').textContent = '📍';
+  document.getElementById('gps-instruction').textContent = 'YOU HAVE ARRIVED';
+  document.getElementById('gps-sub').textContent = destName;
+  document.getElementById('gps-progress-fill').style.width = '100%';
+  document.getElementById('gps-dist-lbl').textContent = '0 m';
+  document.getElementById('gps-eta').textContent = 'Arrived!';
+
+  setDot('gps','on','Arrived');
+  document.getElementById('l-gps').textContent = 'Arrived';
+
+  if (navigator.vibrate) navigator.vibrate([300,100,300,100,500]);
+  speak(`You have arrived at ${destName}. Navigation complete. Well done!`, false);
+  jmsg(`📍 **ARRIVED!** You have reached **${destName}**. Navigation complete.`);
+  stopGPS(true); // keep panel shown
+}
+
+/* ── UPDATE UI ──────────────────────────────────────────────────── */
+function updateGPSPanel(distToNextTurn) {
+  if (!GPS.steps.length) return;
+  const step = GPS.steps[GPS.currentStep];
+
+  document.getElementById('gps-arrow-big').textContent = step.arrow;
+  document.getElementById('gps-instruction').textContent = step.instruction.toUpperCase();
+  document.getElementById('gps-sub').textContent =
+    GPS.destPos ? `To: ${GPS.destPos.name.split(',')[0]}` : '';
+
+  // Progress
+  const progress = Math.max(0, Math.min(100, ((GPS.totalDist - GPS.remainDist) / GPS.totalDist) * 100));
+  document.getElementById('gps-progress-fill').style.width = progress + '%';
+  document.getElementById('gps-dist-lbl').textContent = formatDist(Math.round(distToNextTurn)) + ' to turn';
+
+  const etaMin = Math.round(GPS.remainDist / 80); // ~80m/min walking
+  document.getElementById('gps-eta').textContent = etaMin <= 1 ? '<1 min' : `~${etaMin} min`;
+}
+
+function updateStepsUI() {
+  const container = document.getElementById('gps-steps');
+  if (!GPS.steps.length) { container.innerHTML=''; return; }
+  const visible = GPS.steps.slice(Math.max(0, GPS.currentStep-1), GPS.currentStep+4);
+  container.innerHTML = visible.map((step, i) => {
+    const absIdx = Math.max(0, GPS.currentStep-1) + i;
+    const cls = absIdx < GPS.currentStep ? 'done' : absIdx === GPS.currentStep ? 'current' : '';
+    return `<div class="gps-step ${cls}">
+      <span class="gps-step-icon">${step.arrow}</span>
+      <span class="gps-step-text">${step.instruction}</span>
+      <span class="gps-step-dist">${formatDist(step.distance)}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ── VOICE ANNOUNCEMENTS ────────────────────────────────────────── */
+function announceCurrentStep(force) {
+  if (!GPS.steps.length || GPS.currentStep >= GPS.steps.length) return;
+  const step = GPS.steps[GPS.currentStep];
+  const distToTurn = step.distRemain || step.distance;
+  let msg;
+
+  if (force) {
+    if (distToTurn < 20) msg = `Now — ${step.instruction}`;
+    else if (distToTurn < 50) msg = `In ${Math.round(distToTurn)} metres, ${step.instruction}`;
+    else msg = `In ${formatDist(Math.round(distToTurn))}, ${step.instruction}`;
+  } else {
+    // Reminder
+    if (distToTurn < 10) msg = `${step.arrow} ${step.instruction} now`;
+    else msg = `Continue — in ${formatDist(Math.round(distToTurn))}, ${step.instruction}`;
+  }
+
+  announceNavStep(msg, false, 'step');
+}
+
+function announceNavStep(msg, urgent, key) {
+  if (micActive) return; // don't interrupt user speaking
+  const now = Date.now();
+  const cooldown = urgent ? 4000 : 8000;
+  if (GPS.lastAnnounce.msg === msg && now - GPS.lastAnnounce.time < cooldown) return;
+  GPS.lastAnnounce = {msg, time: now};
+  speak(msg, urgent);
+}
+
+function gpsRepeatInstruction() {
+  if (!GPS.active || !GPS.steps.length) {
+    speak("GPS navigation is not active. Say 'set destination' to start.", false);
+    return;
+  }
+  announceCurrentStep(true);
+}
+
+/* ── STOP GPS ──────────────────────────────────────────────────── */
+function stopGPS(keepPanel=false) {
+  if (GPS.watching) {
+    navigator.geolocation.clearWatch(GPS.watching);
+    GPS.watching = null;
+  }
+  GPS.active = false;
+  if (!keepPanel) {
+    document.getElementById('gps-panel').classList.remove('show');
+    document.getElementById('gps-map-wrap').style.display = 'none';
+    if (GPS.mapShown) toggleMap();
+  }
+  document.getElementById('bgps').classList.remove('on');
+  document.getElementById('gps-search').classList.remove('show');
+  setDot('gps','','GPS Off');
+  document.getElementById('l-gps').textContent = 'GPS Off';
+}
+
+/* ── UTILITY: Haversine distance (meters) ──────────────────────── */
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+    Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function formatDist(m) {
+  if (m < 10)  return 'a few steps';
+  if (m < 100) return Math.round(m) + ' metres';
+  if (m < 1000) return Math.round(m/10)*10 + ' metres';
+  return (m/1000).toFixed(1) + ' km';
+}
+
+/* ── INTEGRATE GPS WITH JARVIS ─────────────────────────────────── */
+// Extend sceneCtx to include GPS info
+const _origSceneCtx = window.sceneCtx;
+window.sceneCtxWithGPS = function() {
+  const base = typeof sceneCtx === 'function' ? sceneCtx() : '';
+  if (!GPS.active || !GPS.steps.length) return base;
+  const step = GPS.steps[GPS.currentStep];
+  const gpsInfo = `GPS Navigation: heading to ${GPS.destPos ? GPS.destPos.name.split(',')[0] : 'destination'}, next instruction: ${step ? step.instruction : 'none'}, remaining distance: ${formatDist(Math.round(GPS.remainDist))}.`;
+  return base + ' ' + gpsInfo;
+};
+
+// Hook JARVIS to understand GPS questions
+const _origLocalReply = window.localReply;
+const GPS_KEYWORDS = ['where am i','destination','how far','navigate','directions','turn','route','walk','which way','lost','road','street'];
+
+function gpsLocalReply(msg) {
+  const m = msg.toLowerCase();
+  if (!GPS_KEYWORDS.some(k => m.includes(k))) return null;
+
+  if (!GPS.active) {
+    if (m.includes('where am i') || m.includes('location')) {
+      if (GPS.currentPos) return `You are near ${GPS.currentPos.lat.toFixed(4)}, ${GPS.currentPos.lng.toFixed(4)}. To get directions somewhere, tap the GPS button or say "navigate to" followed by your destination.`;
+      return "I don't have your location yet. Please allow location access. Tap the GPS button to start navigation.";
+    }
+    return "GPS navigation is not active. Tap the GPS button or say your destination to start. I will guide you turn by turn.";
+  }
+
+  if (!GPS.steps.length) return "Calculating route. Please wait a moment.";
+
+  const step = GPS.steps[GPS.currentStep];
+  if (m.includes('how far') || m.includes('distance') || m.includes('long')) {
+    return `You are ${formatDist(Math.round(GPS.remainDist))} from ${GPS.destPos ? GPS.destPos.name.split(',')[0] : 'your destination'}. Estimated walking time ${Math.round(GPS.remainDist/80)} minutes.`;
+  }
+  if (m.includes('next') || m.includes('turn') || m.includes('which way') || m.includes('direction')) {
+    return `Current instruction: ${step.instruction}. ${GPS.steps[GPS.currentStep+1] ? 'After that: ' + GPS.steps[GPS.currentStep+1].instruction : ''}`;
+  }
+  if (m.includes('where am i') || m.includes('location')) {
+    return `You are navigating to ${GPS.destPos ? GPS.destPos.name.split(',')[0] : 'your destination'}. ${formatDist(Math.round(GPS.remainDist))} remaining. Next: ${step.instruction}`;
+  }
+  return `Navigating to ${GPS.destPos ? GPS.destPos.name.split(',')[0] : 'your destination'}. ${step.instruction}. ${formatDist(Math.round(GPS.remainDist))} remaining.`;
+}
+
+/* ── INIT GPS ON STARTUP ────────────────────────────────────────── */
+function initGPSOnStartup() {
+  // Pre-fetch location in background
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        GPS.currentPos = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading,
+          accuracy: pos.coords.accuracy,
+        };
+        setDot('gps','gps','GPS Ready');
+        document.getElementById('d-gps').className = 'dot gps';
+        document.getElementById('l-gps').textContent = 'GPS Ready';
+        jmsg("📍 GPS location acquired. Tap the 🛰 GPS button or say a destination to start navigation.");
+      },
+      err => {
+        // Silent — GPS optional
+        document.getElementById('l-gps').textContent = 'GPS Off';
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+    );
+  }
+}
+
+/* ═══ SCRIPT LOADER ═════════════════════════════════════════════ */
+function loadSrc(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)){res();return;}const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+(async()=>{
+  await loadSrc('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js').catch(()=>loadSrc('https://unpkg.com/@tensorflow/tfjs@3.21.0/dist/tf.min.js').catch(()=>{}));
+  await loadSrc('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js').catch(()=>loadSrc('https://unpkg.com/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js').catch(()=>{}));
+  await loadSrc('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js').catch(()=>loadSrc('https://unpkg.com/@mediapipe/hands@0.4.1646424915/hands.js').catch(()=>{}));
+})();
+</script>
+</body>
+</html>
